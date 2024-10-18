@@ -18,11 +18,12 @@ class LlamaProgramInterface(pal.interface.ProgramChatInterface):
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
         messages =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        gen = self.model(messages, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
+        outputs = self.model(messages, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
+        program = outputs[0]["generated_text"][-1]['content']
         if self.verbose:
-            print(gen)
-        self.history.append(gen)
-        return self.process_generation_to_code(gen)
+            print(program)
+        self.history.append(program)
+        return self.process_generation_to_code(program)
 
 
 if __name__ == "__main__":
