@@ -1,1 +1,5 @@
-git+git://github.com/reasoning-machines/pal.git
+git+https://github.com/reasoning-machines/pal.git
+datasets
+transformers
+accelerate
+tqdm
