@@ -34,7 +34,14 @@ if __name__ == "__main__":
 
     gsm8k_test = load_dataset("openai/gsm8k", "main", split="test")
     model_str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-    model = LlamaProgramInterface(model=model_str)
+    system_message = '''
+        Write a function to solve a given problem by the user. Only write the program.
+        The function must return `### value` where value is only a number without any signs like '$' or '%'.
+        '''
+    model = LlamaProgramInterface(
+        system_message=system_message,
+        model=model_str
+        )
 
     all_score = []
     i = 0
@@ -44,8 +51,7 @@ if __name__ == "__main__":
         answer = sample["answer"]
         answer = answer.split("#### ")[-1]
         answer = re.findall(r'\d+', answer)[0]
-        user_prompt = f"Write a function to solve the following problem, only write the program. The function must return `### value`:\n{question}"
-
-        output = model.generate(user_prompt)
+        user_prompt = f"{question}"
+        output = model.run(user_prompt)
         print(output)
         break
