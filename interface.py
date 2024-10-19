@@ -36,25 +36,32 @@ if __name__ == "__main__":
     model_str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     system_message = '''
         Write a function to solve a given problem by the user. Only write the program. Do not use `print`.
-        The function must be named solution() and return `### value` where value is only a number without any signs like '$' or '%'.
+        The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.
         '''
     model = LlamaProgramInterface(
         system_message=system_message,
         model=model_str,
         get_answer_expr='solution()',
-        get_answer_symbol='###',
+        # get_answer_symbol='###',
         verbose=True,
         )
 
-    all_score = []
-    i = 0
+    all_scores = []
     for sample in tqdm(gsm8k_test):
 
         question = sample["question"]
         answer = sample["answer"]
         answer = answer.split("#### ")[-1]
-        answer = re.findall(r'\d+', answer)[0]
+        answer = float(re.findall(r'\d+', answer)[0])
         user_prompt = f"{question}"
-        code = model.generate(user_prompt, temperature=0.1)
-        ouput = model.execute(code)
-        break
+        try:
+            ans = model.run(user_prompt, temperature=0.1)
+            ans = float(ans)
+            score = 1 if abs(ans - answer) < 1e-3 else 0
+        except Exception as e:
+            print("Exception:", e)
+            ans = ''
+            score = 0
+        all_scores.append(score)
+
+    print(f'Accuracy - {sum(all_scores) / len(all_scores)}')
