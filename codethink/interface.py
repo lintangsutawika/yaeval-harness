@@ -14,6 +14,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             model_kwargs={"torch_dtype": torch.bfloat16},
             device_map="auto",
         )
+        self.model.generation_config.pad_token_id = self.model.tokenizer.pad_token_id
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
         message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
