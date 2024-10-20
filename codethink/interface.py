@@ -17,11 +17,12 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
         message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        message = self.model.tokenizer.apply_chat_template(
-                    message,
-                    tokenize=False,
-                    add_generation_prompt=True
-                    )
+        # message = self.model.tokenizer.apply_chat_template(
+        #             message,
+        #             tokenize=False,
+        #             return_dict=True,
+        #             add_generation_prompt=True
+        #             )
         output = self.model(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
         program = output[0]["generated_text"][-1]['content']
         if self.verbose:
