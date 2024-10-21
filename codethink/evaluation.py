@@ -55,8 +55,8 @@ class EvaluateSystem:
                 }
             )
 
-        logger.INFO(f"{self.run_name} complete")
-        logger.INFO(f"Score on {self.dataset.name}: {sum(all_scores)/len(all_scores)}")
+        logger.info(f"{self.run_name} complete")
+        logger.info(f"Score on {self.dataset.name}: {sum(all_scores)/len(all_scores)}")
         if self.output_path is not None:
             os.path.join(self.output_path, f"{self.run_name}.jsonl")
             with jsonlines.open(self.output_file, "w") as file:
