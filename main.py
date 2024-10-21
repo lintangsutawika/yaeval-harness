@@ -32,11 +32,6 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Path to output file",
     )
     parser.add_argument(
-        "--trust_remote_code",
-        action="store_true",
-        help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
-    )
-    parser.add_argument(
         "--get_answer_expr",
         type=str,
         default="solution()",
