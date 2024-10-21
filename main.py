@@ -115,8 +115,13 @@ if __name__ == "__main__":
         args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
 
     if args.inference_mode == "code":
+        system_message = '''
+            Write a function to solve a given problem by the user. Only write the program. Do not use `print`.
+            The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.
+            '''
         model_system = HFProgramInterface(
             model=args.model_str,
+            system_message=system_message,
             get_answer_expr=args.get_answer_expr,
             verbose=args.verbose,
             model_kwargs=simple_parse_args_string(args.model_kwargs)
@@ -159,3 +164,5 @@ if __name__ == "__main__":
         run_name=args.run_name,
         output_path=args.output_path,
     )
+
+    evaluator.run()
