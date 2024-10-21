@@ -34,7 +34,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         self.profile = FlopsProfiler(self.lm.model)
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
-        message =[{'role': 'system', 'content': self.lm_message}, {'role': 'user', 'content': prompt}]
+        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
         # message = self.lm.tokenizer.apply_chat_template(
         #             message,
         #             tokenize=False,
@@ -72,7 +72,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
 class HFCoTInterface:
     def __init__(self, model, system_message, get_answer_symbol=None, **kwargs):
 
-        self.lm_message = system_message
+        self.system_message = system_message
         self.get_answer_symbol = get_answer_symbol
         self.lm = transformers.pipeline(
             "text-generation",
@@ -82,7 +82,7 @@ class HFCoTInterface:
         )
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
-        message =[{'role': 'system', 'content': self.lm_message}, {'role': 'user', 'content': prompt}]
+        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
         message = self.lm.tokenizer.apply_chat_template(
                     message,
                     tokenize=False,
