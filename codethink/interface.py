@@ -3,7 +3,7 @@ import torch
 import transformers
 
 import pal
-from flops_profiler import FlopsProfiler
+from flops_profiler.profiler import FlopsProfiler
 
 logger = logging.getLogger(__name__)
 
