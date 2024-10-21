@@ -126,6 +126,9 @@ if __name__ == "__main__":
             model_kwargs=simple_parse_args_string(args.model_kwargs)
             )
     
+    dataset = TransformedDataset(
+        
+    )
     evaluator = EvaluateSystem(
         model=model,
         dataset=dataset,
