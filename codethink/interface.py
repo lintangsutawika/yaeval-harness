@@ -22,7 +22,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
 
         self.lm = transformers.pipeline(
             "text-generation",
-            model=self.lm,
+            model=self.model,
             revision=revision,
             device=device,
             device_map=device_map,
