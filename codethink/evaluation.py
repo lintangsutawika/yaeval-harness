@@ -1,29 +1,38 @@
+import os
+import datetime
+import jsonlines
+
 from tqdm import tqdm
 
 
 class EvaluateSystem:
-    def __init__(self, dataset, model_system, verbose=False, run_name=None, output_file=None, **kwargs):
+    def __init__(self,
+                 dataset,
+                 model_system,
+                 return_generation=False,
+                 run_name=None,
+                 output_path=None,
+                 **kwargs
+                 ):
         self.dataset = dataset
         self.model_system = model_system
-        self.verbose = verbose
-        self.output_file = output_file
+        self.return_generation = return_generation
+        if run_name is None:
+            current_time = datetime.datetime.now()
+            self.run_name = current_time.strftime("%Y-%m-%d-%H:%M:%S")
+        else:
+            self.run_name = run_name
+        self.output_path = output_path
 
     def run(self, temperature=0.1):
-        output_dict = {
-            "idx": [],
-            "score": [],
-            "answer": [],
-            "ground_truth": [],
-            "system_output": [],
-            "user_input": [],
-        }
         all_scores = []
+        output_json = []
         for idx, sample in enumerate(tqdm(self.dataset)):
             user_input, ground_truth = sample
             system_output = None
             try:
-                ans = self.model_system.run(user_input, temperature=temperature, return_generation=self.verbose)
-                if self.verbose:
+                ans = self.model_system.run(user_input, temperature=temperature, return_generation=self.return_generation)
+                if self.return_generation:
                     ans, system_output = ans
                 ans = float(ans)
                 score = 1 if abs(ans - ground_truth) < 1e-3 else 0
@@ -33,16 +42,20 @@ class EvaluateSystem:
                 score = 0
 
             all_scores.append(score)
-            if self.verbose:
-                output_dict["idx"].append(idx)
-                output_dict["score"].append(score)
-                output_dict["answer"].append(ans)
-                output_dict["ground_truth"].append(ground_truth)
-                output_dict["system_output"].append(system_output)            
-                output_dict["user_input"].append(user_input)
+            output_json.append(
+                {
+                    "idx": idx,
+                    "score": score,
+                    "answer": ans,
+                    "ground_truth": ground_truth,
+                    "system_output": system_output,
+                    "user_input": user_input,
+                }
+            )
 
         print(f"Score: {sum(all_scores)/len(all_scores)}")
-        # with open(self.output_file, "r") as file:
-        #     for i in range(len(self.dataset)):
-        #         file.write()
-            
+        if self.output_path is not None:
+            os.path.join(self.output_path, f"{self.run_name}.jsonl")
+            with jsonlines.open(self.output_file, "w") as file:
+                file.write_all(output_json)
+                
