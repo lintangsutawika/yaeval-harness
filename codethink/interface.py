@@ -1,9 +1,11 @@
+import logging
 import torch
 import transformers
 
 import pal
+from flops_profiler import FlopsProfiler
 
-# logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 class HFProgramInterface(pal.interface.ProgramChatInterface):
     def __init__(self,
@@ -29,6 +31,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             model_kwargs=model_kwargs,
         )
         self.lm.generation_config.pad_token_id = self.lm.tokenizer.pad_token_id
+        self.profile = FlopsProfiler(self.lm.model)
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
         message =[{'role': 'system', 'content': self.lm_message}, {'role': 'user', 'content': prompt}]
@@ -46,12 +49,21 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         return self.process_generation_to_code(program)
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False):
+        self.profile.start_profile()
         code = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
         with pal.interface.timeout(time_out):
             try:
                 exec_result = self.execute(code)
             except Exception as e:
                 print(e)
+        self.profile.stop_profile()
+        flops = self.profile.get_total_flops()
+        # macs = self.profile.get_total_macs()
+        # params = self.profile.get_total_params()
+        # if print_profile:
+        #     self.profile.print_model_profile(profile_step=profile_step)
+        logger.INFO(f"Flops: {flops}")
+        self.profile.end_profile()
         if return_generation:
             return exec_result, code    
         return exec_result
