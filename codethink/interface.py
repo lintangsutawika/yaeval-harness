@@ -30,7 +30,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             trust_remote_code=trust_remote_code,
             model_kwargs=model_kwargs,
         )
-        self.lm.generation_config.pad_token_id = self.lm.tokenizer.pad_token_id
+        self.lm.generation_config.pad_token_id = self.lm.tokenizer.eos_token_id
         self.profile = FlopsProfiler(self.lm.model)
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
