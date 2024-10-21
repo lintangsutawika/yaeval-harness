@@ -7,6 +7,7 @@ from datasets import load_dataset
 
 from codethink.utils import simple_parse_args_string
 from codethink.interface import HFProgramInterface
+from codethink.dataset import TransformedDataset
 from codethink.evaluation import EvaluateSystem
 
 
@@ -119,19 +120,46 @@ if __name__ == "__main__":
         args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
 
     if args.inference_mode == "code":
-        model = HFProgramInterface(
+        model_system = HFProgramInterface(
             model=args.model_str,
             get_answer_expr=args.get_answer_expr,
             verbose=args.verbose,
             model_kwargs=simple_parse_args_string(args.model_kwargs)
             )
+    # else:
+    #     model_system = HFProgramInterface(
+    #         model=args.model_str,
+    #         get_answer_expr=args.get_answer_expr,
+    #         verbose=args.verbose,
+    #         model_kwargs=simple_parse_args_string(args.model_kwargs)
+    #         )
     
-    dataset = TransformedDataset(
-        
+    def gsm8k_output(x):
+        answer = x["answer"]
+        answer = answer.split("#### ")[-1]
+        answer = float(re.findall(r'\d+', answer)[0])
+        return answer
+
+    # def gsm8k_fewshot_output(x):
+    #     answer = x["answer"]
+    #     answer = re.sub("####", "So the answer is", answer)
+    #     return answer
+
+    gsm8k_dataset = TransformedDataset(
+        data_path="gsm8k",
+        data_name="main",
+        input_text="question",
+        output_text=gsm8k_output,
+        # fewshot_output_text=gsm8k_fewshot_output,
+        test_split="test",
+        fewshot_split="train",
+        # num_fewshot=8,
+        sampler=None,
     )
+
     evaluator = EvaluateSystem(
-        model=model,
-        dataset=dataset,
+        model_system=model_system,
+        dataset=gsm8k_dataset,
         return_generation=args.return_generation,
         run_name=args.run_name,
         output_path=args.output_path,
