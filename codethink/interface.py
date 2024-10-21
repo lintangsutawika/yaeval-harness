@@ -3,28 +3,42 @@ import transformers
 
 import pal
 
+# logger = logging.getLogger(__name__)
 
 class HFProgramInterface(pal.interface.ProgramChatInterface):
-    def __init__(self, *args, **kwargs):
+    def __init__(self,
+                 *args,
+                revision="main",
+                device=None,
+                model_kwargs={},
+                device_map="auto",
+                torch_dtype="auto",
+                trust_remote_code=False,
+                **kwargs
+        ):
         super().__init__(*args, **kwargs)
 
-        self.model = transformers.pipeline(
+        self.lm = transformers.pipeline(
             "text-generation",
-            model=self.model,
-            model_kwargs={"torch_dtype": torch.bfloat16},
-            device_map="auto",
+            model=self.lm,
+            revision=revision,
+            device=device,
+            device_map=device_map,
+            torch_dtype=torch_dtype,
+            trust_remote_code=trust_remote_code,
+            model_kwargs=model_kwargs,
         )
-        self.model.generation_config.pad_token_id = self.model.tokenizer.pad_token_id
+        self.lm.generation_config.pad_token_id = self.lm.tokenizer.pad_token_id
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
-        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        # message = self.model.tokenizer.apply_chat_template(
+        message =[{'role': 'system', 'content': self.lm_message}, {'role': 'user', 'content': prompt}]
+        # message = self.lm.tokenizer.apply_chat_template(
         #             message,
         #             tokenize=False,
         #             return_dict=True,
         #             add_generation_prompt=True
         #             )
-        output = self.model(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
+        output = self.lm(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
         program = output[0]["generated_text"][-1]['content']
         if self.verbose:
             print(program)
@@ -42,12 +56,13 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             return exec_result, code    
         return exec_result
 
+
 class HFCoTInterface:
     def __init__(self, model, system_message, get_answer_symbol=None, **kwargs):
 
-        self.system_message = system_message
+        self.lm_message = system_message
         self.get_answer_symbol = get_answer_symbol
-        self.model = transformers.pipeline(
+        self.lm = transformers.pipeline(
             "text-generation",
             model=model,
             model_kwargs={"torch_dtype": torch.bfloat16},
@@ -55,13 +70,13 @@ class HFCoTInterface:
         )
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
-        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        message = self.model.tokenizer.apply_chat_template(
+        message =[{'role': 'system', 'content': self.lm_message}, {'role': 'user', 'content': prompt}]
+        message = self.lm.tokenizer.apply_chat_template(
                     message,
                     tokenize=False,
                     add_generation_prompt=True
                     )
-        output = self.model(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
+        output = self.lm(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
         return output
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False):
