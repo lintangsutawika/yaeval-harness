@@ -19,6 +19,18 @@ def setup_parser() -> argparse.ArgumentParser:
         "--inference_mode", "-i", type=str, help="Solve task by generating code or other test time inference approaches"
     )
     parser.add_argument(
+        "--run_name",
+        type=str,
+        default=None,
+        help="Name of inference run",
+    )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        default=None,
+        help="Path to output file",
+    )
+    parser.add_argument(
         "--trust_remote_code",
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
@@ -62,6 +74,11 @@ def setup_parser() -> argparse.ArgumentParser:
         "--trust_remote_code",
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
+    )
+    parser.add_argument(
+        "--return_generation",
+        action="store_true",
+        help="Return system output",
     )
     return parser
 
@@ -111,5 +128,8 @@ if __name__ == "__main__":
     
     evaluator = EvaluateSystem(
         model=model,
-        # dataset=dataset
+        dataset=dataset,
+        return_generation=args.return_generation,
+        run_name=args.run_name,
+        output_path=args.output_path,
     )
