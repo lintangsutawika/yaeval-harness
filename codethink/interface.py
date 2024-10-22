@@ -65,8 +65,8 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         logger.info(f"Flops: {flops}")
         self.profile.end_profile()
         if return_generation:
-            return exec_result, code    
-        return exec_result
+            return exec_result, flops, code
+        return exec_result, flops
 
 
 class HFCoTInterface:
@@ -127,7 +127,7 @@ if __name__ == "__main__":
         answer = float(re.findall(r'\d+', answer)[0])
         user_prompt = f"{question}"
         try:
-            ans = model.run(user_prompt, temperature=0.1)
+            ans, flops = model.run(user_prompt, temperature=0.1)
             ans = float(ans)
             score = 1 if abs(ans - answer) < 1e-3 else 0
         except Exception as e:
