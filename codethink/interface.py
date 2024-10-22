@@ -68,11 +68,14 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         return exec_result, flops
 
 
-class HFCoTInterface:
-    def __init__(self, model, system_message, get_answer_symbol=None, **kwargs):
+class HFNatLangInterface:
+    def __init__(self, model, system_message, repeat=1, get_answer_symbol=None, fallback="[INVALID]", **kwargs):
 
         self.system_message = system_message
-        self.get_answer_symbol = get_answer_symbol
+        self.repeat = repeat
+        # self.get_answer_symbol = get_answer_symbol
+        self.get_answer_symbol = re.compile(get_answer_symbol)
+        self.fallback = fallback
         self.lm = transformers.pipeline(
             "text-generation",
             model=model,
@@ -90,12 +93,33 @@ class HFCoTInterface:
         output = self.lm(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
         return output
 
-    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False):
-        output = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
-        # TODO Implement Chain-of-Thought process
-        result = ""
+    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False, repeat=None):
+        if repeat is None:
+            repeat = self.repeat
+
+        all_output = []
+        all_results = []
+        for n in range(repeat):
+            output = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+            all_output.append(output)
+            if self.get_answer_symbol is not None:
+                match = self.get_answer_symbol.findall(output)
+                match = match[0] if match else self.fallback
+                
+                if match in all_results:
+                    all_results[match] += 1
+                else:
+                    all_results[match] = 1
+
+        if repeat == 1:
+            result = all_results.keys()[0]
+        else:
+            counts = list(all_results.values())
+            max_idx = counts.index(max(counts))
+            result = list(all_results.keys())[max_idx]
+
         if return_generation:
-            return result, output
+            return result, all_output
         return result
 
 if __name__ == "__main__":
