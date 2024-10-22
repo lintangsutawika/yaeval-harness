@@ -130,8 +130,8 @@ class HFNatLangInterface:
         #     self.profile.print_model_profile(profile_step=profile_step)
         self.profile.end_profile()
         if return_generation:
-            return result, all_output
-        return result
+            return result, flops, all_output
+        return result, flops
 
 if __name__ == "__main__":
 
