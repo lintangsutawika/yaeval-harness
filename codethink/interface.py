@@ -97,6 +97,7 @@ class HFNatLangInterface:
         #             add_generation_prompt=True
         #             )
         output = self.lm(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
+        output = output[0]["generated_text"][-1]['content']
         if self.verbose:
             print(output)
         self.history.append(output)
