@@ -6,7 +6,7 @@ from tqdm import tqdm
 from datasets import load_dataset
 
 from codethink.utils import simple_parse_args_string
-from codethink.interface import HFProgramInterface
+from codethink.interface import HFProgramInterface, HFNatLangInterface
 from codethink.dataset import TransformedDataset
 from codethink.evaluation import EvaluateSystem
 
@@ -115,6 +115,7 @@ if __name__ == "__main__":
         args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
 
     if args.inference_mode == "code":
+        num_fewshot = 0
         system_message = '''
             Write a function to solve a given problem by the user. Only write the program. Do not use `print`.
             The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.
@@ -126,13 +127,26 @@ if __name__ == "__main__":
             verbose=args.verbose,
             model_kwargs=simple_parse_args_string(args.model_kwargs)
             )
-    # else:
-    #     model_system = HFProgramInterface(
-    #         model=args.model_str,
-    #         get_answer_expr=args.get_answer_expr,
-    #         verbose=args.verbose,
-    #         model_kwargs=simple_parse_args_string(args.model_kwargs)
-    #         )
+        
+        gsm8k_fewshot_output = None
+    else:
+        num_fewshot = 4
+        system_message = '''
+            Solve the problem by thinking step-by-step. Go through the reasoning in order to derive the final answer.
+            The final answer should follow the words 'So the answer is'.
+            '''
+        model_system = HFNatLangInterface(
+            model=args.model_str,
+            system_message=system_message,
+            get_answer_symbol=r"the answer is (\-?[0-9\.\,]+)",
+            verbose=True,
+            )
+
+        def gsm8k_fewshot_output(x):
+            answer = x["answer"]
+            answer = re.sub("####", "So the answer is", answer)
+            return answer
+
     
     def gsm8k_output(x):
         answer = x["answer"]
@@ -140,20 +154,15 @@ if __name__ == "__main__":
         answer = float(re.findall(r'\d+', answer)[0])
         return answer
 
-    # def gsm8k_fewshot_output(x):
-    #     answer = x["answer"]
-    #     answer = re.sub("####", "So the answer is", answer)
-    #     return answer
-
     gsm8k_dataset = TransformedDataset(
         data_path="gsm8k",
         data_name="main",
         input_text="question",
         output_text=gsm8k_output,
-        # fewshot_output_text=gsm8k_fewshot_output,
+        fewshot_output_text=gsm8k_fewshot_output,
         test_split="test",
         fewshot_split="train",
-        # num_fewshot=8,
+        num_fewshot=num_fewshot,
         sampler=None,
     )
 
