@@ -70,13 +70,14 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
 
 
 class HFNatLangInterface:
-    def __init__(self, model, system_message, repeat=1, get_answer_symbol=None, fallback="[INVALID]", **kwargs):
+    def __init__(self, model, system_message, repeat=1, get_answer_symbol=None, fallback="[INVALID]", verbose=False, **kwargs):
 
         self.system_message = system_message
         self.repeat = repeat
         # self.get_answer_symbol = get_answer_symbol
         self.get_answer_symbol = re.compile(get_answer_symbol)
         self.fallback = fallback
+        self.verbose = verbose
         self.lm = transformers.pipeline(
             "text-generation",
             model=model,

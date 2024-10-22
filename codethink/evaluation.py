@@ -45,6 +45,7 @@ class EvaluateSystem:
                 print("Exception:", e)
                 ans = ''
                 score = 0
+                flops = -1
 
             all_scores.append(score)
             output_json.append(
