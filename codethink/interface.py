@@ -1,3 +1,4 @@
+import re
 import logging
 import torch
 import transformers
@@ -85,12 +86,15 @@ class HFNatLangInterface:
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
         message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        message = self.lm.tokenizer.apply_chat_template(
-                    message,
-                    tokenize=False,
-                    add_generation_prompt=True
-                    )
+        # message = self.lm.tokenizer.apply_chat_template(
+        #             message,
+        #             tokenize=False,
+        #             add_generation_prompt=True
+        #             )
         output = self.lm(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
+        if self.verbose:
+            print(output)
+        self.history.append(output)
         return output
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False, repeat=None):
