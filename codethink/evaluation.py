@@ -35,7 +35,9 @@ class EvaluateSystem:
             try:
                 ans = self.model_system.run(user_input, temperature=temperature, return_generation=self.return_generation)
                 if self.return_generation:
-                    ans, system_output = ans
+                    ans, flops, system_output = ans
+                else:
+                    ans, flops = ans
                 ans = float(ans)
                 score = 1 if abs(ans - ground_truth) < 1e-3 else 0
             except Exception as e:
@@ -49,6 +51,7 @@ class EvaluateSystem:
                     "idx": idx,
                     "score": score,
                     "answer": ans,
+                    "flops": flops,
                     "ground_truth": ground_truth,
                     "system_output": system_output,
                     "user_input": user_input,
