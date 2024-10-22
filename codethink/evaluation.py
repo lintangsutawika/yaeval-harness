@@ -29,7 +29,7 @@ class EvaluateSystem:
     def run(self, temperature=0.1):
         all_scores = []
         output_json = []
-        for idx, sample in enumerate(tqdm(self.dataset)):
+        for idx, sample in tqdm(enumerate(self.dataset)):
             user_input, ground_truth = sample
             system_output = None
             try:
@@ -40,7 +40,7 @@ class EvaluateSystem:
                     ans, flops = ans
                 ans = float(ans)
                 score = 1 if abs(ans - ground_truth) < 1e-3 else 0
-                logger.info(f"Score: {score}, Flops: {flops}")
+                logger.info(f"Score: {score}, Flops: {flops}, Prediction: {ans}, Ground Truth: {ground_truth}")
             except Exception as e:
                 print("Exception:", e)
                 ans = ''
