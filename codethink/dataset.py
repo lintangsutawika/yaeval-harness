@@ -10,6 +10,7 @@ class TransformedDataset(Dataset):
     def __init__(self,
                  data_path: str,
                  data_name: str=None,
+                 name: str=None,
                  input_text: Union[str, Callable]=None,
                  output_text: Union[str, Callable]=None,
                  test_split: str=None,
@@ -22,6 +23,14 @@ class TransformedDataset(Dataset):
                  answer_delimiter: str="\n",
                  ):
         
+        if name is None:
+            if data_name is None:
+                self.name = f"{data_path}"
+            else:
+                self.name = f"{data_path}-{data_name}"
+        else:
+            self.name = name
+
         self.dataset = load_dataset(
             path=data_path,
             name=data_name,
