@@ -40,6 +40,7 @@ class EvaluateSystem:
                     ans, flops = ans
                 ans = float(ans)
                 score = 1 if abs(ans - ground_truth) < 1e-3 else 0
+                logger.info(f"Score: {score}, Flops: {flops}")
             except Exception as e:
                 print("Exception:", e)
                 ans = ''
