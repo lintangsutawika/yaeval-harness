@@ -62,7 +62,6 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         # params = self.profile.get_total_params()
         # if print_profile:
         #     self.profile.print_model_profile(profile_step=profile_step)
-        logger.info(f"Flops: {flops}")
         self.profile.end_profile()
         if return_generation:
             return exec_result, flops, code
