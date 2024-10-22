@@ -87,6 +87,8 @@ class HFNatLangInterface:
         self.lm.generation_config.pad_token_id = self.lm.tokenizer.eos_token_id
         self.profile = FlopsProfiler(self.lm.model)
 
+        self.history = []
+
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
         message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
         # message = self.lm.tokenizer.apply_chat_template(
