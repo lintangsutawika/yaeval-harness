@@ -109,21 +109,20 @@ class HFNatLangInterface:
             repeat = self.repeat
 
         all_output = []
-        all_results = []
+        all_results = {}
         for n in range(repeat):
             output = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
             all_output.append(output)
             if self.get_answer_symbol is not None:
                 match = self.get_answer_symbol.findall(output)
                 match = match[0] if match else self.fallback
-                
                 if match in all_results:
                     all_results[match] += 1
                 else:
                     all_results[match] = 1
 
         if repeat == 1:
-            result = all_results.keys()[0]
+            result = list(all_results.keys())[0]
         else:
             counts = list(all_results.values())
             max_idx = counts.index(max(counts))
