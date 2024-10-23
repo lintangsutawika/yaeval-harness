@@ -6,6 +6,8 @@ import transformers
 import pal
 from flops_profiler.profiler import FlopsProfiler
 
+from vllm import LLM
+
 logger = logging.getLogger(__name__)
 
 class HFProgramInterface(pal.interface.ProgramChatInterface):
@@ -78,9 +80,10 @@ class HFNatLangInterface:
         self.get_answer_symbol = re.compile(get_answer_symbol)
         self.fallback = fallback
         self.verbose = verbose
+
         self.lm = transformers.pipeline(
             "text-generation",
-            model=model,
+            model=LLM(model=model),
             model_kwargs={"torch_dtype": torch.bfloat16},
             device_map="auto",
         )
