@@ -4,9 +4,17 @@ import transformers
 
 import pal
 
-from vllm import LLM, SamplingParams
+from vllm import LLM, SamplingParams, RequestOutput
 
 logger = logging.getLogger(__name__)
+
+
+def get_tokens(model_outputs: RequestOutput):
+    input_tokens = model_outputs[0].prompt_token_ids
+    output_tokens = model_outputs[0].outputs[0].token_ids
+    output_text = model_outputs[0].outputs[0].text
+
+    return output_text, (input_tokens, output_tokens)
 
 class HFProgramInterface(pal.interface.ProgramChatInterface):
     def __init__(self,
@@ -37,23 +45,27 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         )
         sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens)
         output = self.lm.generate(message, sampling_params)
-        program = output[0].outputs[0].text
+        return output
+
+    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False):
+        output = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+        program, tokens = get_tokens(output)
+        computed_tokens = tokens
         if self.verbose:
             print(program)
         self.history.append(program)
-        return self.process_generation_to_code(program)
+        code = self.process_generation_to_code(program)
 
-    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False):
-        code = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
         with pal.interface.timeout(time_out):
             try:
                 exec_result = self.execute(code)
             except Exception as e:
                 print(e)
-        flops = -1
+                return "", computed_tokens, code
+        
         if return_generation:
-            return exec_result, flops, code
-        return exec_result, flops
+            return exec_result, computed_tokens, code
+        return exec_result, computed_tokens
 
 
 class HFNatLangInterface:
@@ -95,10 +107,6 @@ class HFNatLangInterface:
         )
         sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens)
         output = self.lm.generate(message, sampling_params)
-        output = output[0].outputs[0].text
-        if self.verbose:
-            print(output)
-        self.history.append(output)
         return output
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False, repeat=None):
@@ -107,9 +115,15 @@ class HFNatLangInterface:
 
         all_output = []
         all_results = {}
+        all_tokens = []
         for n in range(repeat):
             output = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+            output, tokens = get_tokens(output)
+            if self.verbose:
+                print(output)
+            self.history.append(output)
             all_output.append(output)
+            all_tokens.append(tokens)
             if self.get_answer_symbol is not None:
                 match = self.get_answer_symbol.findall(output)
                 match = match[0] if match else self.fallback
@@ -120,15 +134,16 @@ class HFNatLangInterface:
 
         if repeat == 1:
             result = list(all_results.keys())[0]
+            computed_tokens = all_tokens[0]
         else:
             counts = list(all_results.values())
             max_idx = counts.index(max(counts))
             result = list(all_results.keys())[max_idx]
+            computed_tokens = all_tokens
 
-        flops = -1
         if return_generation:
-            return result, flops, all_output
-        return result, flops
+            return result, computed_tokens, all_output
+        return result, computed_tokens
 
 if __name__ == "__main__":
 
