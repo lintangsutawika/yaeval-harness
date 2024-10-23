@@ -17,7 +17,7 @@ def setup_parser() -> argparse.ArgumentParser:
         "--model_str", "-m", type=str, help="Name of model e.g. `hf`"
     )
     parser.add_argument(
-        "--inference_mode", "-i", type=str, help="Solve task by generating code or other test time inference approaches"
+        "--inference_mode", "-i", type=str, default="code", help="Solve task by generating code or other test time inference approaches"
     )
     parser.add_argument(
         "--run_name",
@@ -127,10 +127,10 @@ if __name__ == "__main__":
             verbose=args.verbose,
             model_kwargs=simple_parse_args_string(args.model_kwargs)
             )
-        
+
         gsm8k_fewshot_output = None
     else:
-        num_fewshot = 4
+        num_fewshot = 0
         system_message = '''
             Solve the problem by thinking step-by-step. Go through the reasoning in order to derive the final answer.
             The final answer should follow the words 'So the answer is'.
@@ -139,7 +139,8 @@ if __name__ == "__main__":
             model=args.model_str,
             system_message=system_message,
             get_answer_symbol=r"the answer is (\-?[0-9\.\,]+)",
-            verbose=True,
+            verbose=args.verbose,
+            model_kwargs=simple_parse_args_string(args.model_kwargs)
             )
 
         def gsm8k_fewshot_output(x):
@@ -147,7 +148,7 @@ if __name__ == "__main__":
             answer = re.sub("####", "So the answer is", answer)
             return answer
 
-    
+
     def gsm8k_output(x):
         answer = x["answer"]
         answer = answer.split("#### ")[-1]
