@@ -5,7 +5,21 @@ import jsonlines
 
 from tqdm import tqdm
 
+from typing import List, Tuple
+
 logger = logging.getLogger(__name__)
+
+def calculate_tokens(tokens):
+    if isinstance(tokens, Tuple):
+        tokens = [tokens]
+    
+    num_tokens = 0
+    for _tokens in tokens:
+        i_tokens, o_tokens = _tokens
+        num_tokens = len(i_tokens + o_tokens)
+
+    return num_tokens
+
 
 class EvaluateSystem:
     def __init__(self,
@@ -32,28 +46,31 @@ class EvaluateSystem:
         for idx, sample in tqdm(enumerate(self.dataset)):
             user_input, ground_truth = sample
             system_output = None
+
+            ans = self.model_system.run(user_input, temperature=temperature, return_generation=self.return_generation)
+            if self.return_generation:
+                ans, tokens, system_output = ans
+            else:
+                ans, tokens = ans
+
+            num_tokens = calculate_tokens(tokens)
+
             try:
-                ans = self.model_system.run(user_input, temperature=temperature, return_generation=self.return_generation)
-                if self.return_generation:
-                    ans, flops, system_output = ans
-                else:
-                    ans, flops = ans
                 ans = float(ans)
                 score = 1 if abs(ans - ground_truth) < 1e-3 else 0
-                logger.info(f"Score: {score}, Flops: {flops}, Prediction: {ans}, Ground Truth: {ground_truth}")
             except Exception as e:
                 print("Exception:", e)
                 ans = ''
                 score = 0
-                flops = -1
 
+            logger.info(f"Score: {score}, tokens: {num_tokens}, Prediction: {ans}, Ground Truth: {ground_truth}")
             all_scores.append(score)
             output_json.append(
                 {
                     "idx": idx,
                     "score": score,
                     "answer": ans,
-                    "flops": flops,
+                    "tokens": num_tokens,
                     "ground_truth": ground_truth,
                     "system_output": system_output,
                     "user_input": user_input,
