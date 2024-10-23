@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 def get_tokens(model_outputs: RequestOutput):
-    input_tokens = model_outputs[0].prompt_token_ids
-    output_tokens = model_outputs[0].outputs[0].token_ids
+    input_tokens = list(model_outputs[0].prompt_token_ids)
+    output_tokens = list(model_outputs[0].outputs[0].token_ids)
     output_text = model_outputs[0].outputs[0].text
 
     return output_text, (input_tokens, output_tokens)
