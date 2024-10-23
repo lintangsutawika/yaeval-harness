@@ -1,10 +1,8 @@
 import re
 import logging
-import torch
 import transformers
 
 import pal
-from flops_profiler.profiler import FlopsProfiler
 
 from vllm import LLM, SamplingParams
 
@@ -23,49 +21,36 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         ):
         super().__init__(*args, **kwargs)
 
-        self.lm = transformers.pipeline(
-            "text-generation",
-            model=self.model,
-            revision=revision,
-            device=device,
-            device_map=device_map,
-            torch_dtype=torch_dtype,
-            trust_remote_code=trust_remote_code,
-            model_kwargs=model_kwargs,
-        )
-        self.lm.generation_config.pad_token_id = self.lm.tokenizer.eos_token_id
-        self.profile = FlopsProfiler(self.lm.model)
+        self.lm = LLM(
+                model=model,
+                revision=revision,
+                trust_remote_code=trust_remote_code,
+                )
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(model)
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
         message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        # message = self.lm.tokenizer.apply_chat_template(
-        #             message,
-        #             tokenize=False,
-        #             return_dict=True,
-        #             add_generation_prompt=True
-        #             )
-        output = self.lm(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
-        program = output[0]["generated_text"][-1]['content']
+        message = self.tokenizer.apply_chat_template(
+            message,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+        output = self.lm.generate(message, sampling_params)
+        program = output[0].outputs[0].text
         if self.verbose:
             print(program)
         self.history.append(program)
         return self.process_generation_to_code(program)
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False):
-        self.profile.start_profile()
         code = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
         with pal.interface.timeout(time_out):
             try:
                 exec_result = self.execute(code)
             except Exception as e:
                 print(e)
-        self.profile.stop_profile()
-        flops = self.profile.get_total_flops()
-        # macs = self.profile.get_total_macs()
-        # params = self.profile.get_total_params()
-        # if print_profile:
-        #     self.profile.print_model_profile(profile_step=profile_step)
-        self.profile.end_profile()
+        flops = -1
         if return_generation:
             return exec_result, flops, code
         return exec_result, flops
@@ -89,27 +74,16 @@ class HFNatLangInterface:
 
         self.system_message = system_message
         self.repeat = repeat
-        # self.get_answer_symbol = get_answer_symbol
         self.get_answer_symbol = re.compile(get_answer_symbol)
         self.fallback = fallback
         self.verbose = verbose
 
-        # self.lm = transformers.pipeline(
-        #     "text-generation",
-        #     model=LLM(model=model),
-        #     revision=revision,
-        #     device=device,
-        #     device_map=device_map,
-        #     torch_dtype=torch_dtype,
-        #     trust_remote_code=trust_remote_code,
-        #     model_kwargs=model_kwargs,
-        # )
-        # self.lm.generation_config.pad_token_id = self.lm.tokenizer.eos_token_id
-        # self.profile = FlopsProfiler(self.lm.model)
-        self.lm = LLM(model=model)
+        self.lm = LLM(
+            model=model,
+            revision=revision,
+            trust_remote_code=trust_remote_code,
+            )
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(model)
-        # self.profile = FlopsProfiler(self.lm)
-
         self.history = []
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
@@ -128,7 +102,6 @@ class HFNatLangInterface:
         return output
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False, repeat=None):
-        # self.profile.start_profile()
         if repeat is None:
             repeat = self.repeat
 
@@ -151,13 +124,7 @@ class HFNatLangInterface:
             counts = list(all_results.values())
             max_idx = counts.index(max(counts))
             result = list(all_results.keys())[max_idx]
-        # self.profile.stop_profile()
-        # flops = self.profile.get_total_flops()
-        # macs = self.profile.get_total_macs()
-        # params = self.profile.get_total_params()
-        # if print_profile:
-        #     self.profile.print_model_profile(profile_step=profile_step)
-        # self.profile.end_profile()
+
         flops = -1
         if return_generation:
             return result, flops, all_output
