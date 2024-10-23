@@ -5,3 +5,4 @@ accelerate
 tqdm
 flops-profiler
 jsonlines
+vllm
