@@ -128,7 +128,7 @@ class HFNatLangInterface:
         return output
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False, repeat=None):
-        self.profile.start_profile()
+        # self.profile.start_profile()
         if repeat is None:
             repeat = self.repeat
 
@@ -151,13 +151,14 @@ class HFNatLangInterface:
             counts = list(all_results.values())
             max_idx = counts.index(max(counts))
             result = list(all_results.keys())[max_idx]
-        self.profile.stop_profile()
-        flops = self.profile.get_total_flops()
+        # self.profile.stop_profile()
+        # flops = self.profile.get_total_flops()
         # macs = self.profile.get_total_macs()
         # params = self.profile.get_total_params()
         # if print_profile:
         #     self.profile.print_model_profile(profile_step=profile_step)
-        self.profile.end_profile()
+        # self.profile.end_profile()
+        flops = -1
         if return_generation:
             return result, flops, all_output
         return result, flops
