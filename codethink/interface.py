@@ -6,7 +6,7 @@ import transformers
 import pal
 from flops_profiler.profiler import FlopsProfiler
 
-from vllm import LLM
+from vllm import LLM, SamplingParams
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,20 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
 
 
 class HFNatLangInterface:
-    def __init__(self, model, system_message, repeat=1, get_answer_symbol=None, fallback="[INVALID]", verbose=False, **kwargs):
+    def __init__(self,
+                 model,
+                 system_message,
+                 repeat=1,
+                 get_answer_symbol=None,
+                 fallback="[INVALID]",
+                 verbose=False,
+                 revision="main",
+                 device=None,
+                 model_kwargs={},
+                 device_map="auto",
+                 torch_dtype="auto",
+                 trust_remote_code=False,
+                 **kwargs):
 
         self.system_message = system_message
         self.repeat = repeat
@@ -81,26 +94,34 @@ class HFNatLangInterface:
         self.fallback = fallback
         self.verbose = verbose
 
-        self.lm = transformers.pipeline(
-            "text-generation",
-            model=LLM(model=model),
-            model_kwargs={"torch_dtype": torch.bfloat16},
-            device_map="auto",
-        )
-        self.lm.generation_config.pad_token_id = self.lm.tokenizer.eos_token_id
-        self.profile = FlopsProfiler(self.lm.model)
+        # self.lm = transformers.pipeline(
+        #     "text-generation",
+        #     model=LLM(model=model),
+        #     revision=revision,
+        #     device=device,
+        #     device_map=device_map,
+        #     torch_dtype=torch_dtype,
+        #     trust_remote_code=trust_remote_code,
+        #     model_kwargs=model_kwargs,
+        # )
+        # self.lm.generation_config.pad_token_id = self.lm.tokenizer.eos_token_id
+        # self.profile = FlopsProfiler(self.lm.model)
+        self.lm = LLM(model=model)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(model)
+        # self.profile = FlopsProfiler(self.lm)
 
         self.history = []
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
         message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        # message = self.lm.tokenizer.apply_chat_template(
-        #             message,
-        #             tokenize=False,
-        #             add_generation_prompt=True
-        #             )
-        output = self.lm(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
-        output = output[0]["generated_text"][-1]['content']
+        message = self.tokenizer.apply_chat_template(
+            message,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+        output = self.lm.generate(message, sampling_params)
+        output = output[0].outputs[0].text
         if self.verbose:
             print(output)
         self.history.append(output)
