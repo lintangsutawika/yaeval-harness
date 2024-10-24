@@ -148,6 +148,8 @@ if __name__ == "__main__":
             answer = re.sub("####", "So the answer is", answer)
             return answer
 
+    def gsm8k_input(x):
+        return "Question: " + x["question"] + "\nAnswer:"
 
     def gsm8k_output(x):
         answer = x["answer"]
@@ -158,7 +160,7 @@ if __name__ == "__main__":
     gsm8k_dataset = TransformedDataset(
         data_path="gsm8k",
         data_name="main",
-        input_text="question",
+        input_text=gsm8k_input,
         output_text=gsm8k_output,
         fewshot_output_text=gsm8k_fewshot_output,
         test_split="test",

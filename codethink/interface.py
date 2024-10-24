@@ -30,11 +30,11 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         super().__init__(*args, **kwargs)
 
         self.lm = LLM(
-                model=model,
+                model=self.model,
                 revision=revision,
                 trust_remote_code=trust_remote_code,
                 )
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(model)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model)
 
     def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
         message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
