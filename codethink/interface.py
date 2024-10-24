@@ -175,7 +175,7 @@ class HFNatLangInterface:
             all_output.append(_output)
             all_output_tokens.append(output_len)
             if self.get_answer_symbol is not None:
-                match = self.get_answer_symbol.findall(output)
+                match = self.get_answer_symbol.findall(_output)
                 match = match[0] if match else self.fallback
                 if match in all_results:
                     all_results[match] += 1
