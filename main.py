@@ -79,6 +79,18 @@ def setup_parser() -> argparse.ArgumentParser:
         help="top_p",
     )
     parser.add_argument(
+        "--num_fewshot",
+        default=0,
+        type=int,
+        help="Number of fewshot examples",
+    )
+    parser.add_argument(
+        "--repeat",
+        default=1,
+        type=int,
+        help="Number of repeats",
+    )
+    parser.add_argument(
         "--trust_remote_code",
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
@@ -142,7 +154,7 @@ if __name__ == "__main__":
 
         gsm8k_fewshot_output = None
     else:
-        num_fewshot = 0
+        num_fewshot = args.num_fewshot
         system_message = '''
             Solve the problem by thinking step-by-step. Go through the reasoning in order to derive the final answer.
             The final answer should follow the words 'So the answer is'.
@@ -150,6 +162,7 @@ if __name__ == "__main__":
         model_system = HFNatLangInterface(
             model=args.model_str,
             system_message=system_message,
+            repeat=args.repeat,
             get_answer_symbol=r"the answer is (\-?[0-9\.\,]+)",
             verbose=args.verbose,
             model_kwargs=simple_parse_args_string(args.model_kwargs)
