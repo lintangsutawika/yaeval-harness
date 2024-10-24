@@ -63,7 +63,7 @@ class EvaluateSystem:
                 ans = ''
                 score = 0
 
-            # logger.info(f"Score: {score}, tokens: {num_tokens}, Prediction: {ans}, Ground Truth: {ground_truth}")
+            logger.info(f"Score: {score}, tokens: {num_tokens}, Prediction: {ans}, Ground Truth: {ground_truth}")
             all_scores.append(score)
             output_json.append(
                 {

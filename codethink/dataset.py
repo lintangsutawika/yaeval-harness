@@ -150,4 +150,3 @@ if __name__ == "__main__":
     print("#### Input ###")
     print(input)
     print("#### Output ###")
-    print(output)
