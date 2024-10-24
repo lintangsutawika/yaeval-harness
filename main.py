@@ -91,6 +91,12 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Number of repeats",
     )
     parser.add_argument(
+        "--seed",
+        default=1234,
+        type=int,
+        help="Number of seed",
+    )
+    parser.add_argument(
         "--trust_remote_code",
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
@@ -160,7 +166,6 @@ The final answer should follow the words 'So the answer is'.\
         model_system = HFNatLangInterface(
             model=args.model_str,
             system_message=system_message,
-            repeat=args.repeat,
             get_answer_symbol=r"answer is (\-?[0-9\.\,]+)",
             verbose=args.verbose,
             model_kwargs=simple_parse_args_string(args.model_kwargs)
@@ -229,4 +234,4 @@ Answer: Olivia had 23 dollars. 5 bagels for 3 dollars each will be 5 x 3 = 15 do
         output_path=args.output_path,
     )
 
-    evaluator.run(temperature=args.temperature, top_p=args.top_p)
+    evaluator.run(temperature=args.temperature, top_p=args.top_p, repeat=args.repeat, seed=args.seed)
