@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 def get_tokens(model_outputs: RequestOutput):
-    input_tokens = list(model_outputs[0].prompt_token_ids)
-    output_tokens = list(model_outputs[0].outputs[0].token_ids)
-    output_text = model_outputs[0].outputs[0].text
+    input_tokens = list(model_outputs.prompt_token_ids)
+    output_tokens = list(model_outputs.outputs[0].token_ids)
+    output_text = model_outputs.outputs[0].text
 
     return output_text, (input_tokens, output_tokens)
 
@@ -51,28 +51,55 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
         start_time = time.time()
         output = self.generate(message, sampling_params)
-        program, tokens = get_tokens(output)
-        input_len, output_len = tokens
-        if self.verbose:
-            print(program)
-        self.history.append(program)
-        code = self.process_generation_to_code(program)
 
-        with pal.interface.timeout(time_out):
-            try:
-                exec_result = self.execute(code)
-            except Exception as e:
-                print(e)
-                exec_result = ""
-        
+        all_output = []
+        all_results = {}
+        all_input_tokens = []
+        all_output_tokens = []
+        for n in range(repeat):
+            program, tokens = get_tokens(output[n])
+            input_len, output_len = tokens
+            if self.verbose:
+                print(program)
+            self.history.append(program)
+            all_output.append(program)
+            all_input_tokens.append(input_len)
+            all_output_tokens.append(output_len)
+            code = self.process_generation_to_code(program)
+
+            with pal.interface.timeout(time_out):
+                try:
+                    exec_result = self.execute(code)
+                except Exception as e:
+                    print(e)
+                    exec_result = ""
+            
+            if exec_result in all_results:
+                all_results[exec_result] += 1
+            else:
+                all_results[exec_result] = 1
+
+        if repeat == 1:
+            result = list(all_results.keys())[0]
+            input_len = all_input_tokens[0]
+            output_len = all_output_tokens[0]
+            output = all_output[0]
+        else:
+            counts = list(all_results.values())
+            max_idx = counts.index(max(counts))
+            result = list(all_results.keys())[max_idx]
+            input_len = all_input_tokens
+            output_len = all_output_tokens
+            output = all_output
+
         duration = time.time() - start_time
         output_dict = {
             "input_len": input_len,
             "output_len": output_len,
             "duration": duration,
-            "system_output": code,
+            "system_output": output,
         }
-        return exec_result, output_dict
+        return result, output_dict
 
 
 class HFNatLangInterface:
@@ -145,12 +172,14 @@ class HFNatLangInterface:
             result = list(all_results.keys())[0]
             input_len = all_input_tokens[0]
             output_len = all_output_tokens[0]
+            output = all_output[0]
         else:
             counts = list(all_results.values())
             max_idx = counts.index(max(counts))
             result = list(all_results.keys())[max_idx]
             input_len = all_input_tokens
             output_len = all_output_tokens
+            output = all_output
 
         duration = time.time() - start_time
         output_dict = {
