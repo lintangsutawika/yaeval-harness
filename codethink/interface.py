@@ -168,7 +168,7 @@ class HFNatLangInterface:
         if isinstance(output, str):
             output = [output]
 
-        for _output in range(output):
+        for _output in output:
             if self.verbose:
                 print(_output)
             self.history.append(_output)
