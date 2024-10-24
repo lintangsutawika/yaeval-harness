@@ -43,7 +43,7 @@ class EvaluateSystem:
     def run(self, temperature=0.1, top_p=1.0):
         all_scores = []
         output_json = []
-        for idx, sample in tqdm(enumerate(self.dataset)):
+        for idx, sample in tqdm(enumerate(self.dataset), total=len(self.dataset)):
             user_input, ground_truth = sample
             system_output = None
 
@@ -63,7 +63,7 @@ class EvaluateSystem:
                 ans = ''
                 score = 0
 
-            logger.info(f"Score: {score}, tokens: {num_tokens}, Prediction: {ans}, Ground Truth: {ground_truth}")
+            # logger.info(f"Score: {score}, tokens: {num_tokens}, Prediction: {ans}, Ground Truth: {ground_truth}")
             all_scores.append(score)
             output_json.append(
                 {
