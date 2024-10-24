@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 def calculate_tokens(tokens):
     if isinstance(tokens, Tuple):
         tokens = [tokens]
-    
+
     num_tokens = 0
     for _tokens in tokens:
         i_tokens, o_tokens = _tokens
