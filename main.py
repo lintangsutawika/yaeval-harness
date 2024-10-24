@@ -153,6 +153,7 @@ The function must be named solution() and return `value` where value is only a n
             model_kwargs=simple_parse_args_string(args.model_kwargs)
             )
 
+        gsm8k_fewshot_input = None
         gsm8k_fewshot_output = None
     else:
         num_fewshot = args.num_fewshot
