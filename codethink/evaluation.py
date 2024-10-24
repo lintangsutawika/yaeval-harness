@@ -14,14 +14,12 @@ class EvaluateSystem:
     def __init__(self,
                  dataset,
                  model_system,
-                 return_generation=False,
                  run_name=None,
                  output_path=None,
                  **kwargs
                  ):
         self.dataset = dataset
         self.model_system = model_system
-        self.return_generation = return_generation
         if run_name is None:
             current_time = datetime.datetime.now()
             self.run_name = current_time.strftime("%Y-%m-%d-%H:%M:%S")
@@ -29,13 +27,13 @@ class EvaluateSystem:
             self.run_name = run_name
         self.output_path = output_path
 
-    def run(self, temperature=0.1, top_p=1.0):
+    def run(self, temperature=0.1, top_p=1.0, repeat=1, seed=None):
         all_scores = []
         output_json = []
         for idx, sample in tqdm(enumerate(self.dataset), total=len(self.dataset)):
             user_input, ground_truth = sample
 
-            ans, output_dict = self.model_system.run(user_input, temperature=temperature, top_p=top_p, return_generation=self.return_generation)
+            ans, output_dict = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
 
             try:
                 ans = float(ans)
