@@ -40,14 +40,14 @@ class EvaluateSystem:
             self.run_name = run_name
         self.output_path = output_path
 
-    def run(self, temperature=0.1):
+    def run(self, temperature=0.1, top_p=1.0):
         all_scores = []
         output_json = []
         for idx, sample in tqdm(enumerate(self.dataset)):
             user_input, ground_truth = sample
             system_output = None
 
-            ans = self.model_system.run(user_input, temperature=temperature, return_generation=self.return_generation)
+            ans = self.model_system.run(user_input, temperature=temperature, top_p=top_p, return_generation=self.return_generation)
             if self.return_generation:
                 ans, tokens, system_output = ans
             else:
