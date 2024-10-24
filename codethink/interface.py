@@ -1,4 +1,5 @@
 import re
+import time
 import logging
 import transformers
 
@@ -47,10 +48,11 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         output = self.lm.generate(message, sampling_params)
         return output
 
-    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False):
+    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512):
+        start_time = time.time()
         output = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
         program, tokens = get_tokens(output)
-        computed_tokens = tokens
+        input_len, output_len = tokens
         if self.verbose:
             print(program)
         self.history.append(program)
@@ -63,9 +65,14 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
                 print(e)
                 return "", computed_tokens, code
         
-        if return_generation:
-            return exec_result, computed_tokens, code
-        return exec_result, computed_tokens
+        duration = time.time() - start_time
+        output_dict = {
+            "input_len": input_len,
+            "output_len": output_len,
+            "duration": duration,
+            "generation": code,
+        }
+        return exec_result, output_dict
 
 
 class HFNatLangInterface:
@@ -109,7 +116,8 @@ class HFNatLangInterface:
         output = self.lm.generate(message, sampling_params)
         return output
 
-    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False, repeat=None):
+    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat=None):
+        start_time = time.time()
         if repeat is None:
             repeat = self.repeat
 
@@ -119,6 +127,7 @@ class HFNatLangInterface:
         for n in range(repeat):
             output = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
             output, tokens = get_tokens(output)
+            input_len, output_len = tokens
             if self.verbose:
                 print(output)
             self.history.append(output)
@@ -141,9 +150,14 @@ class HFNatLangInterface:
             result = list(all_results.keys())[max_idx]
             computed_tokens = all_tokens
 
-        if return_generation:
-            return result, computed_tokens, all_output
-        return result, computed_tokens
+        duration = time.time() - start_time
+        output_dict = {
+            "input_len": input_len,
+            "output_len": output_len,
+            "duration": duration,
+            "generation": output,
+        }
+        return result, output_dict
 
 if __name__ == "__main__":
 
