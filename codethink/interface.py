@@ -146,13 +146,14 @@ class HFNatLangInterface:
         sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
         start_time = time.time()
         output = self.generate(message, sampling_params)
-
+        print("output")
+        print(output)
+        output, tokens = get_tokens(output)
         all_output = []
         all_results = {}
         all_input_tokens = []
         all_output_tokens = []
         for n in range(repeat):
-            output, tokens = get_tokens(output[n])
             input_len, output_len = tokens
             if self.verbose:
                 print(output)
