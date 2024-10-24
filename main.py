@@ -67,6 +67,18 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Map model to device",
     )
     parser.add_argument(
+        "--temperature",
+        default=0.0,
+        type=float,
+        help="temperature",
+    )
+    parser.add_argument(
+        "--top_p",
+        default=1.0,
+        type=float,
+        help="top_p",
+    )
+    parser.add_argument(
         "--trust_remote_code",
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
@@ -177,4 +189,4 @@ if __name__ == "__main__":
         output_path=args.output_path,
     )
 
-    evaluator.run()
+    evaluator.run(temperature=args.temperature, top_p=args.top_p)
