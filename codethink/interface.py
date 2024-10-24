@@ -119,20 +119,20 @@ class HFNatLangInterface:
         sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
         start_time = time.time()
         output = self.generate(message, sampling_params)
-        print(output)
-        import sys; sys.exit()
+
         all_output = []
         all_results = {}
-        all_tokens = []
+        all_input_tokens = []
+        all_output_tokens = []
         for n in range(repeat):
-            output = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
-            output, tokens = get_tokens(output)
+            output, tokens = get_tokens(output[n])
             input_len, output_len = tokens
             if self.verbose:
                 print(output)
             self.history.append(output)
             all_output.append(output)
-            all_tokens.append(tokens)
+            all_input_tokens.append(input_len)
+            all_output_tokens.append(output_len)
             if self.get_answer_symbol is not None:
                 match = self.get_answer_symbol.findall(output)
                 match = match[0] if match else self.fallback
@@ -143,12 +143,14 @@ class HFNatLangInterface:
 
         if repeat == 1:
             result = list(all_results.keys())[0]
-            computed_tokens = all_tokens[0]
+            input_len = all_input_tokens[0]
+            output_len = all_output_tokens[0]
         else:
             counts = list(all_results.values())
             max_idx = counts.index(max(counts))
             result = list(all_results.keys())[max_idx]
-            computed_tokens = all_tokens
+            input_len = all_input_tokens
+            output_len = all_output_tokens
 
         duration = time.time() - start_time
         output_dict = {
