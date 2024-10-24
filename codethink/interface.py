@@ -37,20 +37,20 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
                 )
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model)
 
-    def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
+    def generate(self, message, sampling_params):
+        output = self.lm.generate(message, sampling_params)
+        return output
+
+    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
         message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
         message = self.tokenizer.apply_chat_template(
             message,
             tokenize=False,
             add_generation_prompt=True
         )
-        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens)
-        output = self.lm.generate(message, sampling_params)
-        return output
-
-    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512):
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
         start_time = time.time()
-        output = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+        output = self.generate(message, sampling_params)
         program, tokens = get_tokens(output)
         input_len, output_len = tokens
         if self.verbose:
@@ -63,7 +63,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
                 exec_result = self.execute(code)
             except Exception as e:
                 print(e)
-                return "", computed_tokens, code
+                exec_result = ""
         
         duration = time.time() - start_time
         output_dict = {
@@ -105,22 +105,22 @@ class HFNatLangInterface:
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(model)
         self.history = []
 
-    def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
+    def generate(self, message, sampling_params):
+        output = self.lm.generate(message, sampling_params)
+        return output
+
+    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
         message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
         message = self.tokenizer.apply_chat_template(
             message,
             tokenize=False,
             add_generation_prompt=True
         )
-        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens)
-        output = self.lm.generate(message, sampling_params)
-        return output
-
-    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat=None):
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
         start_time = time.time()
-        if repeat is None:
-            repeat = self.repeat
-
+        output = self.generate(message, sampling_params)
+        print(output)
+        import sys; sys.exit()
         all_output = []
         all_results = {}
         all_tokens = []
