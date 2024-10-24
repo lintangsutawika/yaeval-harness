@@ -28,3 +28,15 @@ def handle_arg_string(arg):
         return float(arg)
     except ValueError:
         return arg
+
+
+def calculate_tokens(tokens):
+    if isinstance(tokens, Tuple):
+        tokens = [tokens]
+
+    num_tokens = 0
+    for _tokens in tokens:
+        i_tokens, o_tokens = _tokens
+        num_tokens = len(i_tokens + o_tokens)
+
+    return num_tokens

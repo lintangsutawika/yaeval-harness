@@ -70,7 +70,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             "input_len": input_len,
             "output_len": output_len,
             "duration": duration,
-            "generation": code,
+            "system_output": code,
         }
         return exec_result, output_dict
 
@@ -155,7 +155,7 @@ class HFNatLangInterface:
             "input_len": input_len,
             "output_len": output_len,
             "duration": duration,
-            "generation": output,
+            "system_output": output,
         }
         return result, output_dict
 
