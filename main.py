@@ -229,7 +229,6 @@ Answer: Olivia had 23 dollars. 5 bagels for 3 dollars each will be 5 x 3 = 15 do
     evaluator = EvaluateSystem(
         model_system=model_system,
         dataset=gsm8k_dataset,
-        return_generation=args.return_generation,
         run_name=args.run_name,
         output_path=args.output_path,
     )
