@@ -95,11 +95,6 @@ def setup_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
     )
-    parser.add_argument(
-        "--return_generation",
-        action="store_true",
-        help="Return system output",
-    )
     return parser
 
 def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
