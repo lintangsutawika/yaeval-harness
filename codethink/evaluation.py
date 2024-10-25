@@ -76,7 +76,7 @@ class EvaluateSystem:
         result_dict["avg_output_tokens"] = result_dict["output_tokens"]/result_dict["n_samples"]
         result_dict["avg_total_tokens"] = result_dict["total_tokens"]/result_dict["n_samples"]
         logger.info(f"{self.run_name} complete")
-        logger.info(f"Score: {result_dict["avg_score"]}")
+        logger.info("Score: {}".format(result_dict["avg_score"]))
 
         run_path = os.path.join(self.output_path, self.run_name)
         os.makedirs(run_path, exist_ok=True)
