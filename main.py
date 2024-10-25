@@ -132,6 +132,8 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
 
+    logger.info(f"Run: {args.run_name}")
+
     if args.trust_remote_code:
         logger.info(
             "Passed `--trust_remote_code`, setting environment variable `HF_DATASETS_TRUST_REMOTE_CODE=true`"
