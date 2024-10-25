@@ -166,7 +166,7 @@ The final answer should follow the words 'So the answer is'.\
         model_system = HFNatLangInterface(
             model=args.model_str,
             system_message=system_message,
-            get_answer_symbol=r"answer is (\-?[0-9\.\,]+)",
+            get_answer_symbol=[r"answer is (\-?[0-9\.\,]+)", r"answer is \$(\-?[0-9\.\,]+)"],
             verbose=args.verbose,
             model_kwargs=simple_parse_args_string(args.model_kwargs)
             )
