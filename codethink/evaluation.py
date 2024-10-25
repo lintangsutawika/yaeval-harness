@@ -44,6 +44,7 @@ class EvaluateSystem:
             ans, output_dict = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
 
             try:
+                ans = str(ans).replace(",", "")
                 ans = float(ans)
                 score = 1 if abs(ans - ground_truth) < 1e-3 else 0
             except Exception as e:
