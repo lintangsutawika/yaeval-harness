@@ -16,18 +16,19 @@ def get_tokens(model_outputs: RequestOutput):
 
     all_output_tokens = []
     all_output_text = []
-    input_tokens = list(model_outputs[0].prompt_token_ids)
+    input_tokens = len(list(model_outputs[0].prompt_token_ids))
+    all_output_tokens = 0
     num = len(model_outputs[0].outputs)
     for output in model_outputs[0].outputs:
 
         output_text = output.text
-        output_tokens = list(output.token_ids)
+        output_tokens = len(list(output.token_ids))
 
         if num == 1:
             return output_text, (input_tokens, output_tokens)
 
         all_output_text.append(output_text)
-        all_output_tokens.append(output_tokens)
+        all_output_tokens += output_tokens
 
     return all_output_text, (input_tokens, all_output_tokens)
 
