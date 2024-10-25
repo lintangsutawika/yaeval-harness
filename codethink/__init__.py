@@ -1,4 +1,4 @@
-from interface import (
+from .interface import (
     HFProgramInterface,
     HFNatLangInterface,
 )
