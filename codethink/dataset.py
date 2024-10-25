@@ -21,6 +21,7 @@ class TransformedDataset(Dataset):
                  sampler: str=None,
                  fewshot_delimiter: str="\n\n",
                  answer_delimiter: str="\n",
+                 n_samples: Union[int, float]=None,
                  ):
         
         if name is None:
@@ -65,8 +66,16 @@ class TransformedDataset(Dataset):
             all_split.append(self.fewshot_split)
 
         for split in all_split:
-
             
+            if isinstance(n_samples, int):
+                self.dataset[split] = self.dataset[split][:n_samples]
+            elif isinstance(n_samples, float):
+                n_samples = int(len(self.dataset[split])*n_samples)
+                self.dataset[split] = self.dataset[split][:n_samples]
+
+                
+
+
             if self.use_fewshot_input:
                 self.dataset[split] = self.dataset[split].map(partial(_transform, fn=fewshot_input_text, feature="__fewshot_input__"))
 
