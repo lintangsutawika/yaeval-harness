@@ -1,12 +1,35 @@
 import re
+import time
 import logging
-import torch
 import transformers
 
+from typing import List
+
 import pal
-from flops_profiler.profiler import FlopsProfiler
+
+from vllm import LLM, SamplingParams, RequestOutput
 
 logger = logging.getLogger(__name__)
+
+
+def get_tokens(model_outputs: RequestOutput):
+
+    all_output_tokens = []
+    all_output_text = []
+    input_tokens = list(model_outputs[0].prompt_token_ids)
+    num = len(model_outputs[0].outputs)
+    for output in model_outputs[0].outputs:
+
+        output_text = output.text
+        output_tokens = list(output.token_ids)
+
+        if num == 1:
+            return output_text, (input_tokens, output_tokens)
+
+        all_output_text.append(output_text)
+        all_output_tokens.append(output_tokens)
+
+    return all_output_text, (input_tokens, all_output_tokens)
 
 class HFProgramInterface(pal.interface.ProgramChatInterface):
     def __init__(self,
@@ -21,100 +44,138 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         ):
         super().__init__(*args, **kwargs)
 
-        self.lm = transformers.pipeline(
-            "text-generation",
-            model=self.model,
-            revision=revision,
-            device=device,
-            device_map=device_map,
-            torch_dtype=torch_dtype,
-            trust_remote_code=trust_remote_code,
-            model_kwargs=model_kwargs,
-        )
-        self.lm.generation_config.pad_token_id = self.lm.tokenizer.eos_token_id
-        self.profile = FlopsProfiler(self.lm.model)
+        self.lm = LLM(
+                model=self.model,
+                revision=revision,
+                trust_remote_code=trust_remote_code,
+                )
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model)
 
-    def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
-        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        # message = self.lm.tokenizer.apply_chat_template(
-        #             message,
-        #             tokenize=False,
-        #             return_dict=True,
-        #             add_generation_prompt=True
-        #             )
-        output = self.lm(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
-        program = output[0]["generated_text"][-1]['content']
-        if self.verbose:
-            print(program)
-        self.history.append(program)
-        return self.process_generation_to_code(program)
-
-    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False):
-        self.profile.start_profile()
-        code = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
-        with pal.interface.timeout(time_out):
-            try:
-                exec_result = self.execute(code)
-            except Exception as e:
-                print(e)
-        self.profile.stop_profile()
-        flops = self.profile.get_total_flops()
-        # macs = self.profile.get_total_macs()
-        # params = self.profile.get_total_params()
-        # if print_profile:
-        #     self.profile.print_model_profile(profile_step=profile_step)
-        self.profile.end_profile()
-        if return_generation:
-            return exec_result, flops, code
-        return exec_result, flops
-
-
-class HFNatLangInterface:
-    def __init__(self, model, system_message, repeat=1, get_answer_symbol=None, fallback="[INVALID]", verbose=False, **kwargs):
-
-        self.system_message = system_message
-        self.repeat = repeat
-        # self.get_answer_symbol = get_answer_symbol
-        self.get_answer_symbol = re.compile(get_answer_symbol)
-        self.fallback = fallback
-        self.verbose = verbose
-        self.lm = transformers.pipeline(
-            "text-generation",
-            model=model,
-            model_kwargs={"torch_dtype": torch.bfloat16},
-            device_map="auto",
-        )
-        self.lm.generation_config.pad_token_id = self.lm.tokenizer.eos_token_id
-        self.profile = FlopsProfiler(self.lm.model)
-
-        self.history = []
-
-    def generate(self, prompt: str, temperature: float = 0.1, top_p: float = 1, max_tokens: int = 512):
-        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        # message = self.lm.tokenizer.apply_chat_template(
-        #             message,
-        #             tokenize=False,
-        #             add_generation_prompt=True
-        #             )
-        output = self.lm(message, temperature=temperature, top_p=top_p, max_new_tokens=max_tokens)
-        output = output[0]["generated_text"][-1]['content']
-        if self.verbose:
-            print(output)
-        self.history.append(output)
+    def generate(self, message, sampling_params):
+        output = self.lm.generate(message, sampling_params)
         return output
 
-    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, return_generation=False, repeat=None):
-        self.profile.start_profile()
-        if repeat is None:
-            repeat = self.repeat
+    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
+        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+        message = self.tokenizer.apply_chat_template(
+            message,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
+        start_time = time.time()
+        output = self.generate(message, sampling_params)
+        program, (input_len, output_len) = get_tokens(output)
 
         all_output = []
         all_results = {}
-        for n in range(repeat):
-            output = self.generate(prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
-            all_output.append(output)
+        all_output_tokens = []
+        if isinstance(program, str):
+            program = [program]
+
+        for _program in program:
+            if self.verbose:
+                print(_program)
+            self.history.append(_program)
+            all_output.append(_program)
+            all_output_tokens.append(_program)
+            code = self.process_generation_to_code(_program)
+
+            with pal.interface.timeout(time_out):
+                try:
+                    exec_result = self.execute(code)
+                except Exception as e:
+                    print(e)
+                    exec_result = ""
+        
+            if exec_result in all_results:
+                all_results[exec_result] += 1
+            else:
+                all_results[exec_result] = 1
+
+        if repeat == 1:
+            result = list(all_results.keys())[0]
+            input_len = input_len
+            output_len = all_output_tokens[0]
+            output = all_output[0]
+        else:
+            counts = list(all_results.values())
+            max_idx = counts.index(max(counts))
+            result = list(all_results.keys())[max_idx]
+            input_len = input_len
+            output_len = all_output_tokens
+            output = all_output
+
+        duration = time.time() - start_time
+        output_dict = {
+            "input_len": input_len,
+            "output_len": output_len,
+            "duration": duration,
+            "system_output": output,
+        }
+        return result, output_dict
+
+
+class HFNatLangInterface:
+    def __init__(self,
+                 model,
+                 system_message,
+                 repeat=1,
+                 get_answer_symbol=None,
+                 fallback="[INVALID]",
+                 verbose=False,
+                 revision="main",
+                 device=None,
+                 model_kwargs={},
+                 device_map="auto",
+                 torch_dtype="auto",
+                 trust_remote_code=False,
+                 **kwargs):
+
+        self.system_message = system_message
+        self.repeat = repeat
+        self.get_answer_symbol = re.compile(get_answer_symbol)
+        self.fallback = fallback
+        self.verbose = verbose
+
+        self.lm = LLM(
+            model=model,
+            revision=revision,
+            trust_remote_code=trust_remote_code,
+            )
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(model)
+        self.history = []
+
+    def generate(self, message, sampling_params):
+        output = self.lm.generate(message, sampling_params)
+        return output
+
+    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
+        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+        message = self.tokenizer.apply_chat_template(
+            message,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
+        start_time = time.time()
+        output = self.generate(message, sampling_params)
+        output, (input_len, output_len) = get_tokens(output)
+
+        all_output = []
+        all_results = {}
+        all_output_tokens = []
+        if isinstance(output, str):
+            output = [output]
+
+        for _output in output:
+            if self.verbose:
+                print(_output)
+            self.history.append(_output)
+            all_output.append(_output)
+            all_output_tokens.append(output_len)
             if self.get_answer_symbol is not None:
-                match = self.get_answer_symbol.findall(output)
+                match = self.get_answer_symbol.findall(_output)
                 match = match[0] if match else self.fallback
                 if match in all_results:
                     all_results[match] += 1
@@ -123,20 +184,23 @@ class HFNatLangInterface:
 
         if repeat == 1:
             result = list(all_results.keys())[0]
+            output_len = all_output_tokens[0]
+            output = all_output[0]
         else:
             counts = list(all_results.values())
             max_idx = counts.index(max(counts))
             result = list(all_results.keys())[max_idx]
-        self.profile.stop_profile()
-        flops = self.profile.get_total_flops()
-        # macs = self.profile.get_total_macs()
-        # params = self.profile.get_total_params()
-        # if print_profile:
-        #     self.profile.print_model_profile(profile_step=profile_step)
-        self.profile.end_profile()
-        if return_generation:
-            return result, flops, all_output
-        return result, flops
+            output_len = all_output_tokens
+            output = all_output
+
+        duration = time.time() - start_time
+        output_dict = {
+            "input_len": input_len,
+            "output_len": output_len,
+            "duration": duration,
+            "system_output": output,
+        }
+        return result, output_dict
 
 if __name__ == "__main__":
 

@@ -3,6 +3,5 @@ datasets
 transformers
 accelerate
 tqdm
-flops-profiler
 jsonlines
 vllm
