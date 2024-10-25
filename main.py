@@ -6,7 +6,8 @@ from tqdm import tqdm
 from datasets import load_dataset
 
 from codethink.utils import simple_parse_args_string
-from codethink.interface import HFProgramInterface, HFNatLangInterface
+# from codethink.interface import HFProgramInterface, HFNatLangInterface
+from codethink import INTERFACE
 from codethink.dataset import TransformedDataset
 from codethink.evaluation import EvaluateSystem
 
@@ -146,7 +147,7 @@ Write a function to solve a given problem by the user. Only write the program. D
 The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.\
 """
 
-        model_system = HFProgramInterface(
+        model_system = INTERFACE[args.inference_mode](
             model=args.model_str,
             system_message=system_message,
             get_answer_expr=args.get_answer_expr,
@@ -163,7 +164,7 @@ Solve the problem by thinking step-by-step. Go through the reasoning in order to
 The final answer should follow the words 'So the answer is'.\
 """
 
-        model_system = HFNatLangInterface(
+        model_system = INTERFACE[args.inference_mode](
             model=args.model_str,
             system_message=system_message,
             get_answer_symbol=[r"answer is (\-?[0-9\.\,]+)", r"answer is \$(\-?[0-9\.\,]+)"],
