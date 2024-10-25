@@ -68,13 +68,10 @@ class TransformedDataset(Dataset):
         for split in all_split:
             
             if isinstance(n_samples, int):
-                self.dataset[split] = self.dataset[split][:n_samples]
+                self.dataset[split] = self.dataset[split].select(n_samples)
             elif isinstance(n_samples, float):
                 n_samples = int(len(self.dataset[split])*n_samples)
-                self.dataset[split] = self.dataset[split][:n_samples]
-
-                
-
+                self.dataset[split] = self.dataset[split].select(n_samples)
 
             if self.use_fewshot_input:
                 self.dataset[split] = self.dataset[split].map(partial(_transform, fn=fewshot_input_text, feature="__fewshot_input__"))
