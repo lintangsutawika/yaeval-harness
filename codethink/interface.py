@@ -134,7 +134,10 @@ class HFNatLangInterface:
 
         self.system_message = system_message
         self.repeat = repeat
-        self.get_answer_symbol = re.compile(get_answer_symbol)
+        if isinstance(get_answer_symbol, str):
+            self.get_answer_symbol = [re.compile(get_answer_symbol)]
+        else:
+            self.get_answer_symbol = [re.compile(pattern) for pattern in get_answer_symbol]
         self.fallback = fallback
         self.verbose = verbose
 
@@ -175,8 +178,12 @@ class HFNatLangInterface:
             all_output.append(_output)
             all_output_tokens.append(output_len)
             if self.get_answer_symbol is not None:
-                match = self.get_answer_symbol.findall(_output)
-                match = match[0] if match else self.fallback
+                match = self.fallback
+                for get_answer_symbol in self.get_answer_symbol:
+                    _match = get_answer_symbol.findall(_output)
+                    if _match:
+                        match = _match[0]
+                        break
                 if match in all_results:
                     all_results[match] += 1
                 else:
