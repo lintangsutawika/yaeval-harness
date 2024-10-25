@@ -98,6 +98,12 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Number of seed",
     )
     parser.add_argument(
+        "--n_samples",
+        default=-1,
+        type=int,
+        help="Number of samples to infer on",
+    )
+    parser.add_argument(
         "--trust_remote_code",
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
@@ -225,6 +231,7 @@ Answer: Olivia had 23 dollars. 5 bagels for 3 dollars each will be 5 x 3 = 15 do
         fewshot_split="train",
         num_fewshot=num_fewshot,
         sampler=None,
+        n_samples=args.n_samples,
     )
 
     evaluator = EvaluateSystem(
