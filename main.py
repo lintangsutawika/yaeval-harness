@@ -160,7 +160,6 @@ The function must be named solution() and return `value` where value is only a n
             system_message=system_message,
             get_answer_expr=args.get_answer_expr,
             verbose=args.verbose,
-            model_kwargs=simple_parse_args_string(args.model_kwargs)
             )
 
         gsm8k_fewshot_input = None
