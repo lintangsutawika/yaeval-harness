@@ -35,10 +35,6 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
     def __init__(self,
                  *args,
                 revision="main",
-                device=None,
-                model_kwargs={},
-                device_map="auto",
-                torch_dtype="auto",
                 trust_remote_code=False,
                 **kwargs
         ):
@@ -125,10 +121,6 @@ class HFNatLangInterface:
                  fallback="[INVALID]",
                  verbose=False,
                  revision="main",
-                 device=None,
-                 model_kwargs={},
-                 device_map="auto",
-                 torch_dtype="auto",
                  trust_remote_code=False,
                  **kwargs):
 
