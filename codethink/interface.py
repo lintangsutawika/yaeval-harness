@@ -102,7 +102,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             "input_len": input_len,
             "output_len": output_len,
             "duration": duration,
-            "system_output": output,
+            "system_output": program,
         }
         return result, output_dict
 
