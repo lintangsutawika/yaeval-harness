@@ -5,20 +5,21 @@ import jsonlines
 
 from tqdm import tqdm
 
+from typing import List, Tuple
+
 logger = logging.getLogger(__name__)
+
 
 class EvaluateSystem:
     def __init__(self,
                  dataset,
                  model_system,
-                 return_generation=False,
                  run_name=None,
                  output_path=None,
                  **kwargs
                  ):
         self.dataset = dataset
         self.model_system = model_system
-        self.return_generation = return_generation
         if run_name is None:
             current_time = datetime.datetime.now()
             self.run_name = current_time.strftime("%Y-%m-%d-%H:%M:%S")
@@ -26,37 +27,32 @@ class EvaluateSystem:
             self.run_name = run_name
         self.output_path = output_path
 
-    def run(self, temperature=0.1):
+    def run(self, temperature=0.1, top_p=1.0, repeat=1, seed=None):
         all_scores = []
         output_json = []
-        for idx, sample in tqdm(enumerate(self.dataset)):
+        for idx, sample in tqdm(enumerate(self.dataset), total=len(self.dataset)):
             user_input, ground_truth = sample
-            system_output = None
+
+            ans, output_dict = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
+
             try:
-                ans = self.model_system.run(user_input, temperature=temperature, return_generation=self.return_generation)
-                if self.return_generation:
-                    ans, flops, system_output = ans
-                else:
-                    ans, flops = ans
                 ans = float(ans)
                 score = 1 if abs(ans - ground_truth) < 1e-3 else 0
-                logger.info(f"Score: {score}, Flops: {flops}, Prediction: {ans}, Ground Truth: {ground_truth}")
             except Exception as e:
                 print("Exception:", e)
                 ans = ''
                 score = 0
-                flops = -1
 
+            logger.info(f"Score: {score}, Prediction: {ans}, Ground Truth: {ground_truth}")
             all_scores.append(score)
             output_json.append(
                 {
                     "idx": idx,
                     "score": score,
                     "answer": ans,
-                    "flops": flops,
                     "ground_truth": ground_truth,
-                    "system_output": system_output,
                     "user_input": user_input,
+                    **output_dict,
                 }
             )
 
