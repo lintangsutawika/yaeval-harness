@@ -6,7 +6,8 @@ from tqdm import tqdm
 from datasets import load_dataset
 
 from codethink.utils import simple_parse_args_string
-from codethink.interface import HFProgramInterface, HFNatLangInterface
+# from codethink.interface import HFProgramInterface, HFNatLangInterface
+from codethink import INTERFACE
 from codethink.dataset import TransformedDataset
 from codethink.evaluation import EvaluateSystem
 
@@ -97,6 +98,12 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Number of seed",
     )
     parser.add_argument(
+        "--n_samples",
+        default=-1,
+        type=int,
+        help="Number of samples to infer on",
+    )
+    parser.add_argument(
         "--trust_remote_code",
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
@@ -146,7 +153,7 @@ Write a function to solve a given problem by the user. Only write the program. D
 The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.\
 """
 
-        model_system = HFProgramInterface(
+        model_system = INTERFACE[args.inference_mode](
             model=args.model_str,
             system_message=system_message,
             get_answer_expr=args.get_answer_expr,
@@ -163,7 +170,7 @@ Solve the problem by thinking step-by-step. Go through the reasoning in order to
 The final answer should follow the words 'So the answer is'.\
 """
 
-        model_system = HFNatLangInterface(
+        model_system = INTERFACE[args.inference_mode](
             model=args.model_str,
             system_message=system_message,
             get_answer_symbol=[r"answer is (\-?[0-9\.\,]+)", r"answer is \$(\-?[0-9\.\,]+)"],
@@ -224,6 +231,7 @@ Answer: Olivia had 23 dollars. 5 bagels for 3 dollars each will be 5 x 3 = 15 do
         fewshot_split="train",
         num_fewshot=num_fewshot,
         sampler=None,
+        n_samples=args.n_samples,
     )
 
     evaluator = EvaluateSystem(
