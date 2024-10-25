@@ -70,7 +70,7 @@ class EvaluateSystem:
             )
 
         logger.info(f"{self.run_name} complete")
-        logger.info(f"Score: {sum(all_scores)/len(all_scores)}")
+        logger.info(f"Score: {result_dict["score"]/result_dict["n_samples"]}")
 
         run_path = os.path.join(self.output_path, self.run_name)
         os.makedirs(run_path, exist_ok=True)
