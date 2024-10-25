@@ -92,16 +92,10 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
 
         if repeat == 1:
             result = list(all_results.keys())[0]
-            input_len = input_len
-            output_len = all_output_tokens[0]
-            output = all_output[0]
         else:
             counts = list(all_results.values())
             max_idx = counts.index(max(counts))
             result = list(all_results.keys())[max_idx]
-            input_len = input_len
-            output_len = all_output_tokens
-            output = all_output
 
         duration = time.time() - start_time
         output_dict = {
@@ -184,14 +178,10 @@ class HFNatLangInterface:
 
         if repeat == 1:
             result = list(all_results.keys())[0]
-            output_len = all_output_tokens[0]
-            output = all_output[0]
         else:
             counts = list(all_results.values())
             max_idx = counts.index(max(counts))
             result = list(all_results.keys())[max_idx]
-            output_len = all_output_tokens
-            output = all_output
 
         duration = time.time() - start_time
         output_dict = {
