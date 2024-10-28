@@ -52,6 +52,16 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         output = self.lm.generate(message, sampling_params)
         return output
 
+    def process_generation_to_code(self, gens: str):
+        if '```python' in gens:
+            gens = gens.split('```python')[1].split('```')[0]
+        elif '```' in gens:
+            gens = gens.split('```')[1].split('```')[0]
+        else:
+            gens = re.sub(r"\s+def", "def", gens)
+            
+        return gens.split('\n')
+
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
         message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
         message = self.tokenizer.apply_chat_template(
@@ -102,7 +112,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             "input_len": input_len,
             "output_len": output_len,
             "duration": duration,
-            "system_output": output,
+            "system_output": program,
         }
         return result, output_dict
 
