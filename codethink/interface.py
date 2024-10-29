@@ -4,6 +4,7 @@ import logging
 import transformers
 
 from typing import List
+from functools import partial
 
 import pal
 
@@ -11,6 +12,26 @@ from vllm import LLM, SamplingParams, RequestOutput
 
 logger = logging.getLogger(__name__)
 
+
+def extract_regex(answer: str, fallback: str, regex: List):
+    match = fallback
+    for _regex in regex:
+        _match = _regex.findall(answer)
+        if _match:
+            match = _match[0]
+            break
+    return match
+
+def extract_fn(answer: str, fallback: str):
+    answer = answer.split('####')[-1].strip()
+
+    for char in [',', '$', '%', 'g']:
+        answer = answer.replace(char, '')
+
+    try:
+        return float(answer)
+    except ValueError:
+        return fallback
 
 def get_tokens(model_outputs: RequestOutput):
 
@@ -132,9 +153,12 @@ class HFNatLangInterface:
         self.system_message = system_message
         self.repeat = repeat
         if isinstance(get_answer_symbol, str):
-            self.get_answer_symbol = [re.compile(get_answer_symbol)]
+            self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(get_answer_symbol)])
+        elif isinstance(get_answer_symbol, List):
+            self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(pattern) for pattern in get_answer_symbol])
         else:
-            self.get_answer_symbol = [re.compile(pattern) for pattern in get_answer_symbol]
+            self.get_answer_symbol = partial(extract_fn, fallback=fallback)
+            
         self.fallback = fallback
         self.verbose = verbose
 
@@ -175,12 +199,7 @@ class HFNatLangInterface:
             all_output.append(_output)
             all_output_tokens.append(output_len)
             if self.get_answer_symbol is not None:
-                match = self.fallback
-                for get_answer_symbol in self.get_answer_symbol:
-                    _match = get_answer_symbol.findall(_output)
-                    if _match:
-                        match = _match[0]
-                        break
+                match = self.get_answer_symbol(_output)
                 if match in all_results:
                     all_results[match] += 1
                 else:
