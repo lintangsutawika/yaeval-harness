@@ -240,9 +240,6 @@ Answer:\
         n_samples=args.n_samples,
     )
 
-    print(gsm8k_dataset.__getitem__(100)[0])
-    import sys; sys.exit()
-
     evaluator = EvaluateSystem(
         model_system=model_system,
         dataset=gsm8k_dataset,
