@@ -24,13 +24,12 @@ def extract_regex(answer: str, fallback: str, regex: List):
 
 def extract_fn(answer: str, fallback: str):
     answer = answer.split('####')[-1].strip()
-
     for char in [',', '$', '%', 'g']:
         answer = answer.replace(char, '')
 
     try:
-        return float(answer)
-    except ValueError:
+        return answer
+    except:
         return fallback
 
 def get_tokens(model_outputs: RequestOutput):
@@ -84,7 +83,8 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         return gens.split('\n')
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
-        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+        # message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
         message = self.tokenizer.apply_chat_template(
             message,
             tokenize=False,
@@ -229,10 +229,10 @@ if __name__ == "__main__":
 
     gsm8k_test = load_dataset("openai/gsm8k", "main", split="test")
     model_str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-    system_message = '''
-        Write a function to solve a given problem by the user. Only write the program. Do not use `print`.
-        The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.
-        '''
+    system_message = '''\
+Write a function to solve a given problem by the user. Only write the program. Do not use `print`.
+The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.\
+'''
     model = HFProgramInterface(
         system_message=system_message,
         model=model_str,
