@@ -181,7 +181,7 @@ The final answer should follow the words 'So the answer is'.\
 
         def gsm8k_fewshot_input(x):
             fewshot_context = """\
-Question:\nThere are 15 trees in the grove. Grove workers will plant trees in the grove today. After they are done, there will be 21 trees. How many trees did the grove workers plant today?\n
+Question:\nThere are 15 trees in the grove. Grove workers will plant trees in the grove today. After they are done, there will be 21 trees. How many trees did the grove workers plant today?
 Answer:\nThere are 15 trees originally. Then there were 21 trees after some more were planted. So there must have been 21 - 15 = 6. The answer is 6.
 
 Question:\nIf there are 3 cars in the parking lot and 2 more cars arrive, how many cars are in the parking lot?
@@ -239,6 +239,9 @@ Answer:\
         sampler=None,
         n_samples=args.n_samples,
     )
+
+    print(gsm8k_dataset.__getitem__(100)[0])
+    import sys; sys.exit()
 
     evaluator = EvaluateSystem(
         model_system=model_system,
