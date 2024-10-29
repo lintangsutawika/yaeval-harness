@@ -1,6 +1,7 @@
 from functools import partial
 
 from codethink.dataset.data import TransformedDataset
+# from data import TransformedDataset
 
 def svamp_input(x):
     return "Question:\n"+x["question_concat"]+"\nAnswer:"
@@ -9,7 +10,7 @@ def svamp_output(x):
     return x["Answer"]
 
 def svamp_fewshot_output(x):
-    return f"Let's think step by step, this is {x["Type"].lower()} problem. So we could write this as {x["Equation"]}. So the answer is {x["Answer"]}"
+    return f"Let's think step by step, this is {x["Type"].lower()} problem. So we could write this as {x["Equation"]}. #### {x["Answer"]}"
 
 SVAMPDataset = partial(
     TransformedDataset,
