@@ -61,6 +61,11 @@ class TransformedDataset(Dataset):
                 example[feature] = fn(example, **kwargs)
             return example
 
+        def prepend_fewshot(example, fewshot_samples):
+            samples = fewshot_samples.copy()
+            samples.append(str(example["__input__"]))
+            return f"{self.fewshot_delimiter}".join(samples)
+
         all_split = [self.test_split]
         if self.fewshot_split is not None:
             all_split.append(self.fewshot_split)
@@ -95,7 +100,7 @@ class TransformedDataset(Dataset):
                 raise NotImplemented
             
             fewshot_samples = self.get_fewshot(sample_idx)
-            self.dataset[test_split] = self.dataset[test_split].map(partial(_transform, fn=self.prepend_fewshot, feature="__input__", fewshot_samples=fewshot_samples))
+            self.dataset[test_split] = self.dataset[test_split].map(partial(_transform, fn=prepend_fewshot, feature="__input__", fewshot_samples=fewshot_samples))
 
     def get_fewshot(self, sample_idx):
         fewshot_samples = []
@@ -111,10 +116,6 @@ class TransformedDataset(Dataset):
                 ])
             )
         return fewshot_samples
-
-    def prepend_fewshot(self, example, fewshot_samples):
-        fewshot_samples.append(str(example["__input__"]))
-        return f"{self.fewshot_delimiter}".join(fewshot_samples)
 
     def __len__(self):
         return len(self.dataset)
