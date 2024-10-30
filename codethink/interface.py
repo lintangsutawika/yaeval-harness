@@ -84,7 +84,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
         # message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
+        message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
         message = self.tokenizer.apply_chat_template(
             message,
             tokenize=False,
@@ -175,7 +175,8 @@ class HFNatLangInterface:
         return output
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
-        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+        # message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+        message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
         message = self.tokenizer.apply_chat_template(
             message,
             tokenize=False,
