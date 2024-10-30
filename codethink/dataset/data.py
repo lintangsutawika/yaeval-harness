@@ -32,10 +32,16 @@ class TransformedDataset(Dataset):
         else:
             self.name = name
 
-        self.dataset = load_dataset(
-            path=data_path,
-            name=data_name,
-        )
+        if data_path in ["json"]:
+            self.dataset = load_dataset(
+                path=data_path,
+                data_files=data_name,
+            )
+        else:
+            self.dataset = load_dataset(
+                path=data_path,
+                name=data_name,
+            )
         self.test_split = test_split
         self.fewshot_split = fewshot_split
         self.num_fewshot = num_fewshot
