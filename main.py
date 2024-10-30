@@ -138,7 +138,8 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
 
-    logger.info(f"Run: {args.run_name}")
+    run_name = args.run_name.replace("/", "-")
+    logger.info(f"Run: {run_name}")
 
     if args.trust_remote_code:
         logger.info(
@@ -157,8 +158,8 @@ if __name__ == "__main__":
     if args.inference_mode == "code":
         num_fewshot = 0
         system_message = """\
-Write a function to solve a given problem by the user. Only write the program. Do not use `print`.
-The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.\
+Solve the problem by writing a program. The function must be named solution() without any input arguments.
+At the end, you MUST return an integer or float value.\
 """
 
         model_system = INTERFACE[args.inference_mode](
@@ -196,7 +197,7 @@ At the end, you MUST write the answer as an integer after '####'."\
     evaluator = EvaluateSystem(
         model_system=model_system,
         dataset=eval_dataset,
-        run_name=args.run_name,
+        run_name=run_name,
         output_path=args.output_path,
     )
 
