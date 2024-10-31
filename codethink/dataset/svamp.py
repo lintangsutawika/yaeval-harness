@@ -12,12 +12,24 @@ def svamp_output(x):
 def svamp_fewshot_output(x):
     return f"Let's think step by step, this is {x["Type"].lower()} problem. So we could write this as {x["Equation"]}. #### {x["Answer"]}"
 
+def svamp_eval(prediction, ground_truth):
+    try:
+        ans = str(ans).replace(",", "")
+        ans = int(ans)
+        ground_truth = int(ground_truth)
+        score = 1 if abs(ans - ground_truth) < 1e-3 else 0
+    except Exception as e:
+        score = 0
+
+    return score
+
 SVAMPDataset = partial(
     TransformedDataset,
     data_path="ChilleD/SVAMP",
     input_text=svamp_input,
     output_text=svamp_output,
     fewshot_output_text=svamp_fewshot_output,
+    eval=svamp_eval,
     test_split="test",
     fewshot_split="train",
 )

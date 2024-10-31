@@ -11,6 +11,7 @@ class TransformedDataset(Dataset):
                  data_path: str,
                  data_name: str=None,
                  name: str=None,
+                 eval: Callable=None,
                  input_text: Union[str, Callable]=None,
                  output_text: Union[str, Callable]=None,
                  test_split: str=None,
@@ -48,6 +49,7 @@ class TransformedDataset(Dataset):
         self.sampler = sampler
         self.fewshot_delimiter = fewshot_delimiter
         self.answer_delimiter = answer_delimiter
+        self.eval = eval
 
         self.use_fewshot_input = False
         if fewshot_input_text is not None:
@@ -122,6 +124,9 @@ class TransformedDataset(Dataset):
                 ])
             )
         return fewshot_samples
+
+    def eval(self, prediction, ground_truth):
+        return self.eval(prediction, ground_truth)
 
     def __len__(self):
         return len(self.dataset)

@@ -17,6 +17,18 @@ def tabmwp_output(x):
 def tabmwp_fewshot_output(x):
     return f"Let's think step by step. {x["solution"]} #### {x["answer"]}"
 
+def tabmwp_eval(prediction, ground_truth):
+    try:
+        prediction = float(prediction)
+        ground_truth = float(ground_truth)
+        score = 1 if abs(prediction - ground_truth) < 1e-3 else 0
+    except Exception as e:
+        prediction = str(prediction)
+        ground_truth = str(ground_truth)
+        score = 1 if prediction == ground_truth else 0
+
+    return score
+
 TabMWPDataset = partial(
     TransformedDataset,
     data_path="json",
@@ -27,6 +39,7 @@ TabMWPDataset = partial(
     input_text=tabmwp_input,
     output_text=tabmwp_output,
     fewshot_output_text=tabmwp_fewshot_output,
+    eval=tabmwp_eval.
     test_split="test",
     fewshot_split="dev",
 )
