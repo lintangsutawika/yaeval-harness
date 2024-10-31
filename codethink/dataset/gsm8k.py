@@ -48,10 +48,10 @@ def gsm8k_output(x):
 
 def gsm8k_eval(prediction, ground_truth):
     try:
-        ans = str(ans).replace(",", "")
-        ans = float(ans)
+        prediction = str(prediction).replace(",", "")
+        prediction = float(prediction)
         ground_truth = float(ground_truth)
-        score = 1 if abs(ans - ground_truth) < 1e-3 else 0
+        score = 1 if abs(prediction - ground_truth) < 1e-3 else 0
     except Exception as e:
         print("Exception:", e)
         score = 0
