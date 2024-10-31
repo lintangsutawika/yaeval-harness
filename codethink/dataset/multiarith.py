@@ -14,12 +14,24 @@ def multiarith_output(x):
 # def multiarith_fewshot_output(x):
 #     return f"Let's think step by step. {x["rationale"]} #### {x["final_ans"]}"
 
+def multiarith_eval(prediction, ground_truth):
+    try:
+        ans = str(ans).replace(",", "")
+        ans = int(ans)
+        ground_truth = int(ground_truth)
+        score = 1 if abs(ans - ground_truth) < 1e-3 else 0
+    except Exception as e:
+        score = 0
+
+    return score
+
 MultiArithDataset = partial(
     TransformedDataset,
     data_path="ChilleD/MultiArith",
     input_text=multiarith_input,
     output_text=multiarith_output,
     # fewshot_output_text=multiarith_fewshot_output,
+    eval=multiarith_eval,
     test_split="test",
     fewshot_split="train",
 )

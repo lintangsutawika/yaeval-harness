@@ -46,6 +46,18 @@ def gsm8k_output(x):
     answer = float(re.findall(r'\d+', answer)[0])
     return answer
 
+def gsm8k_eval(prediction, ground_truth):
+    try:
+        ans = str(ans).replace(",", "")
+        ans = float(ans)
+        ground_truth = float(ground_truth)
+        score = 1 if abs(ans - ground_truth) < 1e-3 else 0
+    except Exception as e:
+        print("Exception:", e)
+        score = 0
+
+    return score
+
 GSM8KDataset = partial(
     TransformedDataset,
     data_path="gsm8k",
@@ -54,6 +66,7 @@ GSM8KDataset = partial(
     output_text=gsm8k_output,
     fewshot_input_text=gsm8k_fewshot_input,
     fewshot_output_text=gsm8k_fewshot_output,
+    eval=gsm8k_eval,
     test_split="test",
     fewshot_split="train",
 )
