@@ -38,22 +38,13 @@ class EvaluateSystem:
             "output_tokens": 0,
         }
         output_json = []
-        for idx, sample in tqdm(enumerate(self.dataset), total=len(self.dataset)):
+        for idx, sample in enumerate(self.dataset):
             user_input, ground_truth = sample
 
             ans, output_dict = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
+            score = self.dataset.eval(ans, ground_truth)
 
-            try:
-                ans = str(ans).replace(",", "")
-                ans = float(ans)
-                ground_truth = float(ground_truth)
-                score = 1 if abs(ans - ground_truth) < 1e-3 else 0
-            except Exception as e:
-                print("Exception:", e)
-                ans = ''
-                score = 0
-
-            logger.info(f"Score: {score}, Prediction: {ans}, Ground Truth: {ground_truth}")
+            logger.info(f"\nId: {idx}, Score: {score}, Prediction: {ans}, Ground Truth: {ground_truth}")
             result_dict["n_samples"] += 1
             result_dict["score"] += score
             result_dict["duration"] += output_dict["duration"]
