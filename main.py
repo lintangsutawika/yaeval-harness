@@ -114,6 +114,10 @@ def setup_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
     )
+    parser.add_argument(
+        "--alt_prompt",
+        action="store_true",
+    )
     return parser
 
 def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
@@ -162,6 +166,11 @@ Solve the problem by writing a program. The function must be named solution() wi
 At the end, you MUST return an integer or float value.\
 """
 
+        if args.alt_prompt:
+            system_message = """\
+Solve the problem by DIRECTLY and ONLY writing a program. The function must be named solution() without any input arguments.
+At the end, you MUST return an integer or float value.\
+"""
         model_system = INTERFACE[args.inference_mode](
             model=args.model_str,
             system_message=system_message,
