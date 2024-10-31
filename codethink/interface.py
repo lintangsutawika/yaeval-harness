@@ -112,6 +112,8 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             with pal.interface.timeout(time_out):
                 try:
                     exec_result = self.execute(code)
+                    if isinstance(exec_result, List):
+                        exec_result = exec_result[0]
                 except Exception as e:
                     print(e)
                     exec_result = ""
