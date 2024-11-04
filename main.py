@@ -168,7 +168,7 @@ if __name__ == "__main__":
 
         datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
 
-        args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
+        # args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
 
     if args.system_message is not None:
         system_message = SYSTEM_MESSAGE[args.system_message]
@@ -181,7 +181,7 @@ if __name__ == "__main__":
         get_answer_expr=args.get_answer_expr,
         verbose=args.verbose,
         use_system_role=args.use_system_role,
-        model_kwargs=simple_parse_args_string(args.model_kwargs),
+        # model_kwargs=simple_parse_args_string(args.model_kwargs),
         )
 
     eval_dataset = DATASET[args.task](
