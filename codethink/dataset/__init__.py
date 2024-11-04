@@ -6,6 +6,9 @@ from .aqua import AQUADataset
 from .multiarith import MultiArithDataset
 from .tabmwp import TabMWPDataset
 from .bbh import BBHDataset
+from .gsm_hard import GSMHardDataset
+from .finqa import FinQADataset
+from .mathqa import MathQADataset
 
 DATASET = {
     "svamp": SVAMPDataset,
@@ -14,4 +17,7 @@ DATASET = {
     "multiarith": MultiArithDataset,
     "tabmwp": TabMWPDataset,
     **BBHDataset,
+    "gsmhard": GSMHardDataset,
+    "finqa": FinQADataset,
+    "mathqa": MathQADataset,
 }
