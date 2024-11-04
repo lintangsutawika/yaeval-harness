@@ -5,6 +5,7 @@ from .gsm8k import GSM8KDataset
 from .aqua import AQUADataset
 from .multiarith import MultiArithDataset
 from .tabmwp import TabMWPDataset
+from .bbh import BBHDataset
 
 DATASET = {
     "svamp": SVAMPDataset,
@@ -12,4 +13,5 @@ DATASET = {
     "aqua": AQUADataset,
     "multiarith": MultiArithDataset,
     "tabmwp": TabMWPDataset,
+    **BBHDataset,
 }
