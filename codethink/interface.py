@@ -1,6 +1,8 @@
 import re
+import sys
 import time
 import logging
+import subprocess
 import transformers
 
 from typing import List
@@ -57,6 +59,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
                  *args,
                 revision="main",
                 trust_remote_code=False,
+                use_system_role=False,
                 **kwargs
         ):
         super().__init__(*args, **kwargs)
@@ -67,6 +70,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
                 trust_remote_code=trust_remote_code,
                 )
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model)
+        self.use_system_role = use_system_role
 
     def generate(self, message, sampling_params):
         output = self.lm.generate(message, sampling_params)
@@ -83,8 +87,14 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         return gens.split('\n')
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
-        # message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
+
+        def generate_code(code, answer_expr):
+            return "\n".join(code)+f"\nprint({answer_expr})"
+
+        if self.use_system_role:
+            message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+        else:
+            message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
         message = self.tokenizer.apply_chat_template(
             message,
             tokenize=False,
@@ -109,14 +119,15 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             all_output_tokens.append(_program)
             code = self.process_generation_to_code(_program)
 
-            with pal.interface.timeout(time_out):
-                try:
-                    exec_result = self.execute(code)
-                    if isinstance(exec_result, List):
-                        exec_result = exec_result[0]
-                except Exception as e:
-                    print(e)
-                    exec_result = ""
+            # Generate code snippet that will be executed in a different process
+            code_snippet = generate_code(code, self.answer_expr)
+
+            try:
+                subprocess_result = subprocess.run([sys.executable, "-c", code_snippet], timeout=time_out, text=True, capture_output=True)
+                exec_result = subprocess_result.stdout.strip()
+            except Exception as e:
+                print(e)
+                exec_result = ""
         
             if exec_result in all_results:
                 all_results[exec_result] += 1
@@ -150,9 +161,11 @@ class HFNatLangInterface:
                  verbose=False,
                  revision="main",
                  trust_remote_code=False,
+                 use_system_role=False,
                  **kwargs):
 
         self.system_message = system_message
+        self.use_system_role = use_system_role
         self.repeat = repeat
         if isinstance(get_answer_symbol, str):
             self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(get_answer_symbol)])
@@ -177,8 +190,10 @@ class HFNatLangInterface:
         return output
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
-        # message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
+        if self.use_system_role:
+            message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+        else:
+            message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
         message = self.tokenizer.apply_chat_template(
             message,
             tokenize=False,
