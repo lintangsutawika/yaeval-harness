@@ -89,7 +89,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
 
         def generate_code(code, answer_expr):
-            return "\n".join(code)+f"\nprint({answer_expr})"
+            return "\n".join(code)+f"\nans = 'ans='+str({answer_expr})\nprint(ans)"
 
         if self.use_system_role:
             message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
@@ -124,7 +124,8 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
 
             try:
                 subprocess_result = subprocess.run([sys.executable, "-c", code_snippet], timeout=time_out, text=True, capture_output=True)
-                exec_result = subprocess_result.stdout.strip()
+                exec_result = subprocess_result.stdout.split("ans=")[-1].strip()
+                
             except Exception as e:
                 print(e)
                 exec_result = ""
