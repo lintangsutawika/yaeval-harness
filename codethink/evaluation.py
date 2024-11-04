@@ -42,10 +42,10 @@ class EvaluateSystem:
             user_input, ground_truth = sample
 
             ans, output_dict = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
-            try:
-                ans = type(ground_truth)(ans)
-            except:
-                ans = str(ans)
+            # try:
+            #     ans = type(ground_truth)(ans)
+            # except:
+            #     ans = str(ans)
 
             score = self.dataset.eval(ans, ground_truth)
 
