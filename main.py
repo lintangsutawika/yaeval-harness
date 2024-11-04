@@ -7,7 +7,7 @@ from datasets import load_dataset
 
 from codethink.utils import simple_parse_args_string
 # from codethink.interface import HFProgramInterface, HFNatLangInterface
-from codethink import INTERFACE
+from codethink import INTERFACE, SYSTEM_MESSAGE
 from codethink.dataset import DATASET
 from codethink.evaluation import EvaluateSystem
 
@@ -104,6 +104,17 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Task to evaluate model on",
     )
     parser.add_argument(
+        "--system_message",
+        default=None,
+        type=str,
+        help="Custom system message",
+    )
+    parser.add_argument(
+        "--use_system_role",
+        action="store_true",
+        help="Put System message in the system role (might not be available for all models)",
+    )
+    parser.add_argument(
         "--n_samples",
         default=None,
         type=int,
@@ -159,44 +170,22 @@ if __name__ == "__main__":
 
         args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
 
-    if args.inference_mode == "code":
-        num_fewshot = 0
-#         system_message = """\
-# Solve the problem by writing a program. The function must be named solution() without any input arguments.
-# At the end, you MUST return an integer or float value.\
-# """
-        system_message = """\
-Solve the problem by DIRECTLY and ONLY writing a program. The function must be named solution() without any input arguments.
-At the end, you MUST return an single value.\
-"""
-        model_system = INTERFACE[args.inference_mode](
-            model=args.model_str,
-            system_message=system_message,
-            get_answer_expr=args.get_answer_expr,
-            verbose=args.verbose,
-            )
-
-        gsm8k_fewshot_input = None
-        gsm8k_fewshot_output = None
+    if args.system_message is not None:
+        system_message = SYSTEM_MESSAGE[args.system_message]
     else:
-        num_fewshot = args.num_fewshot
-        system_message = """\
-Solve the problem by thinking step-by-step. Go through the reasoning in order to derive the final answer.
-At the end, you MUST write the answer as an integer after '####'."\
-"""
-# The final answer should follow the words 'So the answer is'.\
+        system_message = SYSTEM_MESSAGE[args.inference_mode]
 
-
-        model_system = INTERFACE[args.inference_mode](
-            model=args.model_str,
-            system_message=system_message,
-            # get_answer_symbol=[r"answer is (\-?[0-9\.\,]+)", r"answer is \$(\-?[0-9\.\,]+)"],
-            verbose=args.verbose,
-            model_kwargs=simple_parse_args_string(args.model_kwargs)
-            )
+    model_system = INTERFACE[args.inference_mode](
+        model=args.model_str,
+        system_message=system_message,
+        get_answer_expr=args.get_answer_expr,
+        verbose=args.verbose,
+        use_system_role=args.use_system_role,
+        model_kwargs=simple_parse_args_string(args.model_kwargs),
+        )
 
     eval_dataset = DATASET[args.task](
-        num_fewshot=num_fewshot,
+        num_fewshot=args.num_fewshot,
         sampler=None,
         n_samples=args.n_samples,
     )
