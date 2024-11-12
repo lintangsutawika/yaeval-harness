@@ -69,7 +69,10 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
                 revision=revision,
                 trust_remote_code=trust_remote_code,
                 )
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+            self.model,
+            trust_remote_code=trust_remote_code
+            )
         self.use_system_role = use_system_role
 
     def generate(self, message, sampling_params):
@@ -91,15 +94,18 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         def generate_code(code, answer_expr):
             return "\n".join(code)+f"\nans = 'ans='+str({answer_expr})\nprint(ans)"
 
-        if self.use_system_role:
-            message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        else:
-            message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
-        message = self.tokenizer.apply_chat_template(
-            message,
-            tokenize=False,
-            add_generation_prompt=True
-        )
+        try:
+            if self.use_system_role:
+                message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+            else:
+                message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
+            message = self.tokenizer.apply_chat_template(
+                message,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+        except:
+            message = self.system_message+"\n\n"+prompt
         sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
         start_time = time.time()
         output = self.generate(message, sampling_params)
@@ -183,7 +189,10 @@ class HFNatLangInterface:
             revision=revision,
             trust_remote_code=trust_remote_code,
             )
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(model)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+            self.model,
+            trust_remote_code=trust_remote_code
+            )
         self.history = []
 
     def generate(self, message, sampling_params):
@@ -191,15 +200,18 @@ class HFNatLangInterface:
         return output
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
-        if self.use_system_role:
-            message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        else:
-            message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
-        message = self.tokenizer.apply_chat_template(
-            message,
-            tokenize=False,
-            add_generation_prompt=True
-        )
+        try:
+            if self.use_system_role:
+                message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+            else:
+                message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
+            message = self.tokenizer.apply_chat_template(
+                message,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+        except:
+            message = self.system_message+"\n\n"+prompt
         sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
         start_time = time.time()
         output = self.generate(message, sampling_params)
