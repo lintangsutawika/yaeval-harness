@@ -181,6 +181,7 @@ if __name__ == "__main__":
         get_answer_expr=args.get_answer_expr,
         verbose=args.verbose,
         use_system_role=args.use_system_role,
+        trust_remote_code=args.trust_remote_code,
         # model_kwargs=simple_parse_args_string(args.model_kwargs),
         )
 
