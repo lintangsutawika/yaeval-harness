@@ -171,6 +171,7 @@ class HFNatLangInterface:
                  use_system_role=False,
                  **kwargs):
 
+        self.model = model
         self.system_message = system_message
         self.use_system_role = use_system_role
         self.repeat = repeat
@@ -185,7 +186,7 @@ class HFNatLangInterface:
         self.verbose = verbose
 
         self.lm = LLM(
-            model=model,
+            model=self.model,
             revision=revision,
             trust_remote_code=trust_remote_code,
             )
