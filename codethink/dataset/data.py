@@ -33,7 +33,7 @@ class TransformedDataset(Dataset):
         else:
             self.name = name
 
-        if data_path in ["json"]:
+        if data_path in ["json", "csv"]:
             self.dataset = load_dataset(
                 path=data_path,
                 data_files=data_name,
