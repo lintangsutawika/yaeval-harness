@@ -75,7 +75,7 @@ bbh_tasks = [
 BBHDataset = {}
 
 for task in bbh_tasks:
-    BBHDataset[task] = partial(
+    BBHDataset["bbh_"+task] = partial(
         TransformedDataset,
         data_path="lighteval/big_bench_hard",
         data_name=task,
