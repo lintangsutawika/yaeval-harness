@@ -1,9 +1,12 @@
 import re
+import sys
 import time
 import logging
+import subprocess
 import transformers
 
 from typing import List
+from functools import partial
 
 import pal
 
@@ -11,6 +14,25 @@ from vllm import LLM, SamplingParams, RequestOutput
 
 logger = logging.getLogger(__name__)
 
+
+def extract_regex(answer: str, fallback: str, regex: List):
+    match = fallback
+    for _regex in regex:
+        _match = _regex.findall(answer)
+        if _match:
+            match = _match[0]
+            break
+    return match
+
+def extract_fn(answer: str, fallback: str):
+    answer = answer.split('####')[-1].strip()
+    for char in [',', '$', '%', 'g']:
+        answer = answer.replace(char, '')
+
+    try:
+        return answer
+    except:
+        return fallback
 
 def get_tokens(model_outputs: RequestOutput):
 
@@ -37,6 +59,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
                  *args,
                 revision="main",
                 trust_remote_code=False,
+                use_system_role=False,
                 **kwargs
         ):
         super().__init__(*args, **kwargs)
@@ -46,7 +69,11 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
                 revision=revision,
                 trust_remote_code=trust_remote_code,
                 )
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+            self.model,
+            trust_remote_code=trust_remote_code
+            )
+        self.use_system_role = use_system_role
 
     def generate(self, message, sampling_params):
         output = self.lm.generate(message, sampling_params)
@@ -63,12 +90,22 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         return gens.split('\n')
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
-        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        message = self.tokenizer.apply_chat_template(
-            message,
-            tokenize=False,
-            add_generation_prompt=True
-        )
+
+        def generate_code(code, answer_expr):
+            return "\n".join(code)+f"\nans = 'ans='+str({answer_expr})\nprint(ans)"
+
+        try:
+            if self.use_system_role:
+                message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+            else:
+                message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
+            message = self.tokenizer.apply_chat_template(
+                message,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+        except:
+            message = self.system_message+"\n\n"+prompt
         sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
         start_time = time.time()
         output = self.generate(message, sampling_params)
@@ -88,12 +125,16 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             all_output_tokens.append(_program)
             code = self.process_generation_to_code(_program)
 
-            with pal.interface.timeout(time_out):
-                try:
-                    exec_result = self.execute(code)
-                except Exception as e:
-                    print(e)
-                    exec_result = ""
+            # Generate code snippet that will be executed in a different process
+            code_snippet = generate_code(code, self.answer_expr)
+
+            try:
+                subprocess_result = subprocess.run([sys.executable, "-c", code_snippet], timeout=time_out, text=True, capture_output=True)
+                exec_result = subprocess_result.stdout.split("ans=")[-1].strip()
+                
+            except Exception as e:
+                print(e)
+                exec_result = ""
         
             if exec_result in all_results:
                 all_results[exec_result] += 1
@@ -127,23 +168,32 @@ class HFNatLangInterface:
                  verbose=False,
                  revision="main",
                  trust_remote_code=False,
+                 use_system_role=False,
                  **kwargs):
 
+        self.model = model
         self.system_message = system_message
+        self.use_system_role = use_system_role
         self.repeat = repeat
         if isinstance(get_answer_symbol, str):
-            self.get_answer_symbol = [re.compile(get_answer_symbol)]
+            self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(get_answer_symbol)])
+        elif isinstance(get_answer_symbol, List):
+            self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(pattern) for pattern in get_answer_symbol])
         else:
-            self.get_answer_symbol = [re.compile(pattern) for pattern in get_answer_symbol]
+            self.get_answer_symbol = partial(extract_fn, fallback=fallback)
+            
         self.fallback = fallback
         self.verbose = verbose
 
         self.lm = LLM(
-            model=model,
+            model=self.model,
             revision=revision,
             trust_remote_code=trust_remote_code,
             )
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(model)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+            self.model,
+            trust_remote_code=trust_remote_code
+            )
         self.history = []
 
     def generate(self, message, sampling_params):
@@ -151,12 +201,18 @@ class HFNatLangInterface:
         return output
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
-        message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
-        message = self.tokenizer.apply_chat_template(
-            message,
-            tokenize=False,
-            add_generation_prompt=True
-        )
+        try:
+            if self.use_system_role:
+                message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+            else:
+                message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
+            message = self.tokenizer.apply_chat_template(
+                message,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+        except:
+            message = self.system_message+"\n\n"+prompt
         sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
         start_time = time.time()
         output = self.generate(message, sampling_params)
@@ -175,12 +231,7 @@ class HFNatLangInterface:
             all_output.append(_output)
             all_output_tokens.append(output_len)
             if self.get_answer_symbol is not None:
-                match = self.fallback
-                for get_answer_symbol in self.get_answer_symbol:
-                    _match = get_answer_symbol.findall(_output)
-                    if _match:
-                        match = _match[0]
-                        break
+                match = self.get_answer_symbol(_output)
                 if match in all_results:
                     all_results[match] += 1
                 else:
@@ -210,10 +261,10 @@ if __name__ == "__main__":
 
     gsm8k_test = load_dataset("openai/gsm8k", "main", split="test")
     model_str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-    system_message = '''
-        Write a function to solve a given problem by the user. Only write the program. Do not use `print`.
-        The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.
-        '''
+    system_message = '''\
+Write a function to solve a given problem by the user. Only write the program. Do not use `print`.
+The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.\
+'''
     model = HFProgramInterface(
         system_message=system_message,
         model=model_str,
