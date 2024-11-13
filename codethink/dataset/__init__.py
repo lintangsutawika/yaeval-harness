@@ -9,6 +9,7 @@ from .bbh import BBHDataset
 from .gsm_hard import GSMHardDataset
 from .finqa import FinQADataset
 from .mathqa import MathQADataset
+from .coinflip import CoinFlipDataset
 
 DATASET = {
     "svamp": SVAMPDataset,
@@ -20,4 +21,5 @@ DATASET = {
     "gsmhard": GSMHardDataset,
     "finqa": FinQADataset,
     "mathqa": MathQADataset,
+    "coinflip": CoinFlipDataset,
 }
