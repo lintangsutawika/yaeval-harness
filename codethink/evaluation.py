@@ -38,21 +38,18 @@ class EvaluateSystem:
             "output_tokens": 0,
         }
         output_json = []
-        for idx, sample in tqdm(enumerate(self.dataset), total=len(self.dataset)):
+        for idx, sample in enumerate(self.dataset):
             user_input, ground_truth = sample
 
             ans, output_dict = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
+            # try:
+            #     ans = type(ground_truth)(ans)
+            # except:
+            #     ans = str(ans)
 
-            try:
-                ans = str(ans).replace(",", "")
-                ans = float(ans)
-                score = 1 if abs(ans - ground_truth) < 1e-3 else 0
-            except Exception as e:
-                print("Exception:", e)
-                ans = ''
-                score = 0
+            score = self.dataset.eval(ans, ground_truth)
 
-            logger.info(f"Score: {score}, Prediction: {ans}, Ground Truth: {ground_truth}")
+            logger.info(f"\nId: {idx}, Score: {score}, Prediction: {ans}, Ground Truth: {ground_truth}")
             result_dict["n_samples"] += 1
             result_dict["score"] += score
             result_dict["duration"] += output_dict["duration"]
@@ -81,12 +78,15 @@ class EvaluateSystem:
         run_path = os.path.join(self.output_path, self.run_name)
         os.makedirs(run_path, exist_ok=True)
         if self.output_path is not None:
-            output_file = os.path.join(run_path, "output.jsonl")
-            with jsonlines.open(output_file, "w") as file:
-                file.write_all(output_json)
-
             result_file = os.path.join(run_path, "result.json")
             with open(result_file, 'w', encoding='utf-8') as file:
                 json.dump(result_dict, file, ensure_ascii=False, indent=4)
+
+            try:
+                output_file = os.path.join(run_path, "output.jsonl")
+                with jsonlines.open(output_file, "w") as file:
+                    file.write_all(output_json)
+            except Exception as e:
+                print(e)
 
         return 0
