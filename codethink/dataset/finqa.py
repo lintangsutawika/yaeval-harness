@@ -23,11 +23,36 @@ def finqa_output(x):
 # def finqa_fewshot_output(x):
 #     return f"Let's think step by step. {x["solution"]} #### {x["answer"]}"
 
+def match_decimals(prediction, ground_truth):
+    decimal_places = str(ground_truth)[::-1].find('.')
+    decimal_places = decimal_places if decimal_places != -1 else 0
+    rounded_prediction = round(prediction, decimal_places)
+    
+    return rounded_prediction
+
+
 def finqa_eval(prediction, ground_truth):
     try:
-        prediction = float(prediction)
-        ground_truth = float(ground_truth)
-        score = 1 if abs(prediction - ground_truth) < 1e-3 else 0
+
+        if ground_truth in ["yes", "no"]:
+            if prediction == "True":
+                prediction = "yes"
+            elif prediction == "False":
+                prediction = "no"
+
+            score = 1 if prediction == ground_truth else 0
+
+        else:
+            prediction = float(prediction)
+            if "%" in ground_truth:
+                ground_truth = ground_truth.replace("%", "")
+                if prediction < 0:
+                    prediction * 100    
+                
+            ground_truth = float(ground_truth)
+            prediction = match_decimals(prediction, ground_truth)
+            score = 1 if abs(prediction - ground_truth) < 1e-3 else 0
+
     except Exception as e:
         prediction = str(prediction)
         ground_truth = str(ground_truth)
