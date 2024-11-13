@@ -36,7 +36,7 @@ CoinFlipDataset = partial(
 
 if __name__ == "__main__":
 
-    dataset = coinflipDataset(
+    dataset = CoinFlipDataset(
         num_fewshot=5,
         sampler=None,
     )
