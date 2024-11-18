@@ -171,7 +171,10 @@ if __name__ == "__main__":
         # args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
 
     if args.system_message is not None:
-        system_message = SYSTEM_MESSAGE[args.system_message]
+        if args.system_message in SYSTEM_MESSAGE:
+            system_message = SYSTEM_MESSAGE[args.system_message]
+        else:
+            system_message = args.system_message
     else:
         system_message = SYSTEM_MESSAGE[args.inference_mode]
 
