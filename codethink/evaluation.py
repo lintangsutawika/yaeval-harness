@@ -5,8 +5,9 @@ import datetime
 import jsonlines
 
 from tqdm import tqdm
-
 from typing import List, Tuple
+
+from codethink.utils import zeno_upload
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,18 @@ class EvaluateSystem:
             "input_tokens": 0,
             "output_tokens": 0,
         }
+        data_dict = {
+            "idx": [],
+            "answer": [],
+            "system_output": [],
+            "ground_truth": [],
+            "user_input": [],
+            "score": [],
+            "duration": [],
+            "input_tokens": [],
+            "output_tokens": [],
+            "total_tokens": [],
+        }
         output_json = []
         for idx, sample in enumerate(self.dataset):
             user_input, ground_truth = sample
@@ -66,6 +79,18 @@ class EvaluateSystem:
                     **output_dict,
                 }
             )
+
+            data_dict["idx"].append(int(idx))
+            data_dict["answer"].append(ans)
+            data_dict["system_output"].append(output_dict["system_output"][0])
+            data_dict["ground_truth"].append(ground_truth)
+            data_dict["user_input"].append(user_input)
+            data_dict["score"].append(score)
+            data_dict["duration"].append(output_dict["duration"])
+            data_dict["input_tokens"].append(output_dict["input_len"])
+            data_dict["output_tokens"].append(output_dict["output_len"])
+            data_dict["total_tokens"].append(output_dict["input_len"] + output_dict["output_len"])
+        # zeno_upload(self.run_name, data_dict)
 
         result_dict["avg_score"] = result_dict["score"]/result_dict["n_samples"]
         result_dict["avg_duration"] = result_dict["duration"]/result_dict["n_samples"]
