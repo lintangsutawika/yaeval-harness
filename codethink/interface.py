@@ -25,6 +25,7 @@ def extract_regex(answer: str, fallback: str, regex: List):
     return match
 
 def extract_fn(answer: str, fallback: str):
+    # return answer.strip()
     answer = answer.split('####')[-1].strip()
     for char in [',', '$', '%', 'g']:
         answer = answer.replace(char, '')
@@ -197,7 +198,7 @@ class HFNatLangInterface:
         self.history = []
 
     def generate(self, message, sampling_params):
-        output = self.lm.generate(message, sampling_params)
+        output = self.lm.generate(message, sampling_params, use_tqdm=False)
         return output
 
     def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
