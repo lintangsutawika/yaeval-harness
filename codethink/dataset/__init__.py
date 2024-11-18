@@ -11,6 +11,8 @@ from .finqa import FinQADataset
 from .mathqa import MathQADataset
 from .coinflip import CoinFlipDataset
 from .algebra import AlgebraDataset
+from .cnn import CNNDataset, CNNQuestionDataset, qa_dataset
+from .arc_challenge import ARCDataset
 
 DATASET = {
     "svamp": SVAMPDataset,
@@ -24,4 +26,8 @@ DATASET = {
     "mathqa": MathQADataset,
     "coinflip": CoinFlipDataset,
     "algebra": AlgebraDataset,
+    "cnn_summarize": CNNDataset,
+    "cnn_question": CNNQuestionDataset,
+    **qa_dataset,
+    "arc_challenge": ARCDataset,
 }
