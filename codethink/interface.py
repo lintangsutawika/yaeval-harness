@@ -76,7 +76,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         self.use_system_role = use_system_role
 
     def generate(self, message, sampling_params):
-        output = self.lm.generate(message, sampling_params)
+        output = self.lm.generate(message, sampling_params, use_tqdm=False)
         return output
 
     def process_generation_to_code(self, gens: str):
@@ -106,7 +106,7 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             )
         except:
             message = self.system_message+"\n\n"+prompt
-        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop="\n```", include_stop_str_in_output=True)
         start_time = time.time()
         output = self.generate(message, sampling_params)
         program, (input_len, output_len) = get_tokens(output)
