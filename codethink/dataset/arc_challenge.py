@@ -11,7 +11,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 def arc_input(x):
     choices = x["choices"]
     choice_list = [f"{a}. {b}" for a,b in list(zip(choices["label"], choices["text"]))]
-    return f"Question:\n{x["question"]}\n{"\n".join(choice_list)}\nAnswer:"
+    return f"Answer with either A, B, C, or D.\nQuestion:\n{x["question"]}\n{"\n".join(choice_list)}\nAnswer:"
 
 def arc_output(x):
     return x["answerKey"]
@@ -19,6 +19,7 @@ def arc_output(x):
 def arc_eval(prediction, ground_truth):
     score = 0
     try:
+        prediction = prediction.split(".")[0]
         if prediction in ["A", "B", "C", "D"]:
             if prediction == ground_truth:
                 score = 1
