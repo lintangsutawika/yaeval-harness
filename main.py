@@ -18,7 +18,7 @@ def setup_parser() -> argparse.ArgumentParser:
         "--model_str", "-m", type=str, help="Name of model e.g. `hf`"
     )
     parser.add_argument(
-        "--inference_mode", "-i", type=str, default="code", help="Solve task by generating code or other test time inference approaches"
+        "--inference_mode", "-i", type=str, default="default", help="Solve task by generating code or other test time inference approaches"
     )
     parser.add_argument(
         "--run_name",
