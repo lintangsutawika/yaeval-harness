@@ -3,13 +3,13 @@
 # ModelRegistry.register_model("AutoModelforCodeSolverLM", AutoModelforCodeSolverLM)
 
 from .interface import (
-    HFProgramInterface,
+    # HFProgramInterface,
     SolverInterface,
 )
 
 INTERFACE = {
-    "code": HFProgramInterface,
-    "cot": SolverInterface,
+    # "code": HFProgramInterface,
+    "default": SolverInterface,
 }
 
 SYSTEM_MESSAGE = {
