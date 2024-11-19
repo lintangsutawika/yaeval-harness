@@ -121,6 +121,12 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Number of samples to infer on",
     )
     parser.add_argument(
+        "--batch_size",
+        default=1,
+        type=int,
+        help="Batch size",
+    )
+    parser.add_argument(
         "--trust_remote_code",
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
@@ -199,6 +205,8 @@ if __name__ == "__main__":
         dataset=eval_dataset,
         run_name=run_name,
         output_path=args.output_path,
+        run_args=vars(args),
+        batch_size=args.batch_size,
     )
 
     evaluator.run(temperature=args.temperature, top_p=args.top_p, repeat=args.repeat, seed=args.seed)
