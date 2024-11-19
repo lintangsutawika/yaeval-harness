@@ -129,7 +129,7 @@ class TransformedDataset(Dataset):
         return self.eval(prediction, ground_truth)
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.dataset[self.test_split])
 
     def __getitem__(self, i):
         return (
