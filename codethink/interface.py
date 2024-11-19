@@ -25,13 +25,17 @@ def extract_regex(answer: str, fallback: str, regex: List):
     return match
 
 def extract_fn(answer: str, fallback: str):
-    # return answer.strip()
     answer = answer.split('####')[-1].strip()
-    for char in [',', '$', '%', 'g']:
-        answer = answer.replace(char, '')
-
+    # for char in [',', '$', '%', 'g']:
+    #     answer = answer.replace(char, '')
     try:
         return answer
+    except:
+        return fallback
+
+def pass_fn(answer: str, fallback: str):
+    try:
+        return answer.strip()
     except:
         return fallback
 
@@ -39,10 +43,10 @@ def get_tokens(model_outputs: RequestOutput):
 
     all_output_tokens = []
     all_output_text = []
-    input_tokens = len(list(model_outputs[0].prompt_token_ids))
+    input_tokens = len(list(model_outputs.prompt_token_ids))
     all_output_tokens = 0
-    num = len(model_outputs[0].outputs)
-    for output in model_outputs[0].outputs:
+    num = len(model_outputs.outputs)
+    for output in model_outputs.outputs:
 
         output_text = output.text
         output_tokens = len(list(output.token_ids))
@@ -159,12 +163,13 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
         return result, output_dict
 
 
-class HFNatLangInterface:
+class SolverInterface:
     def __init__(self,
                  model,
                  system_message,
                  repeat=1,
                  get_answer_symbol=None,
+                 answer_expr='solution()',
                  fallback="[INVALID]",
                  verbose=False,
                  revision="main",
@@ -180,11 +185,14 @@ class HFNatLangInterface:
             self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(get_answer_symbol)])
         elif isinstance(get_answer_symbol, List):
             self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(pattern) for pattern in get_answer_symbol])
+        elif get_answer_symbol is False:
+            self.get_answer_symbol = partial(pass_fn, fallback=fallback)
         else:
             self.get_answer_symbol = partial(extract_fn, fallback=fallback)
-            
+        self.answer_expr = answer_expr
         self.fallback = fallback
         self.verbose = verbose
+        self.stop = "\n```"
 
         self.lm = LLM(
             model=self.model,
@@ -201,12 +209,24 @@ class HFNatLangInterface:
         output = self.lm.generate(message, sampling_params, use_tqdm=False)
         return output
 
-    def run(self, prompt: str, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
+    def process_generation_to_code(self, gens: str):
+        if '```python' in gens:
+            gens = gens.split('```python')[1].split('```')[0]
+        elif '```' in gens:
+            gens = gens.split('```')[1].split('```')[0]
+        else:
+            return False
+            
+        return gens.split('\n')
+
+    def run(self, prompt, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
+        if isinstance(prompt, str):
+            prompt = [prompt]
         try:
             if self.use_system_role:
-                message =[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': prompt}]
+                message =[[{'role': 'system', 'content': self.system_message}, {'role': 'user', 'content': p}] for p in prompt]
             else:
-                message =[{'role': 'user', 'content': self.system_message+"\n\n"+prompt}]
+                message =[[{'role': 'user', 'content': self.system_message+"\n\n"+p}] for p in prompt]
             message = self.tokenizer.apply_chat_template(
                 message,
                 tokenize=False,
@@ -214,45 +234,72 @@ class HFNatLangInterface:
             )
         except:
             message = self.system_message+"\n\n"+prompt
-        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
+        # sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop=self.stop, include_stop_str_in_output=True)
         start_time = time.time()
-        output = self.generate(message, sampling_params)
-        output, (input_len, output_len) = get_tokens(output)
 
-        all_output = []
-        all_results = {}
-        all_output_tokens = []
-        if isinstance(output, str):
-            output = [output]
+        all_result = []
+        all_output_dict = []
+        for model_output in self.generate(message, sampling_params):
+            output, (input_len, output_len) = get_tokens(model_output)
 
-        for _output in output:
-            if self.verbose:
-                print(_output)
-            self.history.append(_output)
-            all_output.append(_output)
-            all_output_tokens.append(output_len)
-            if self.get_answer_symbol is not None:
-                match = self.get_answer_symbol(_output)
-                if match in all_results:
-                    all_results[match] += 1
+            all_output = []
+            all_results = {}
+            all_output_tokens = []
+            if isinstance(output, str):
+                output = [output]
+
+            for _output in output:
+                if self.verbose:
+                    print(_output)
+                self.history.append(_output)
+                all_output.append(_output)
+                all_output_tokens.append(output_len)
+
+                # Check if the _output is a program
+                code = self.process_generation_to_code(_output)
+                if code:
+                    def _generate_code(code, answer_expr):
+                        return "\n".join(code)+f"\nans = 'ans='+str({answer_expr})\nprint(ans)"
+                    # Generate code snippet that will be executed in a different process
+                    code_snippet = _generate_code(code, self.answer_expr)
+                    try:
+                        subprocess_result = subprocess.run([sys.executable, "-c", code_snippet], timeout=time_out, text=True, capture_output=True)
+                        exec_result = subprocess_result.stdout.split("ans=")[-1].strip()
+                    except Exception as e:
+                        print(e)
+                        exec_result = ""
+
+                    if exec_result in all_results:
+                        all_results[exec_result] += 1
+                    else:
+                        all_results[exec_result] = 1
+
                 else:
-                    all_results[match] = 1
+                    if self.get_answer_symbol is not None:
+                        match = self.get_answer_symbol(_output)
+                        if match in all_results:
+                            all_results[match] += 1
+                        else:
+                            all_results[match] = 1
 
-        if repeat == 1:
-            result = list(all_results.keys())[0]
-        else:
-            counts = list(all_results.values())
-            max_idx = counts.index(max(counts))
-            result = list(all_results.keys())[max_idx]
+            if repeat == 1:
+                result = list(all_results.keys())[0]
+            else:
+                counts = list(all_results.values())
+                max_idx = counts.index(max(counts))
+                result = list(all_results.keys())[max_idx]
 
-        duration = time.time() - start_time
-        output_dict = {
-            "input_len": input_len,
-            "output_len": output_len,
-            "duration": duration,
-            "system_output": output,
-        }
-        return result, output_dict
+            duration = time.time() - start_time
+            output_dict = {
+                "input_len": input_len,
+                "output_len": output_len,
+                "duration": duration,
+                "system_output": output,
+            }
+            all_result.append(result)
+            all_output_dict.append(output_dict)
+        return all_result, all_output_dict
 
 if __name__ == "__main__":
 
