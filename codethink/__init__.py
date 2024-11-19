@@ -4,12 +4,12 @@
 
 from .interface import (
     HFProgramInterface,
-    HFNatLangInterface,
+    SolverInterface,
 )
 
 INTERFACE = {
     "code": HFProgramInterface,
-    "cot": HFNatLangInterface,
+    "cot": SolverInterface,
 }
 
 SYSTEM_MESSAGE = {
@@ -72,13 +72,13 @@ Solve the problem by thinking step-by-step. Go through the reasoning in order to
 At the end, you MUST write the answer as an integer after '####'."\
 """,
     "routing-cot-first" : """\
-Choose to solve the problem by either:
-1. Thinking step-by-step. Go through the reasoning in order to derive the final answer. At the end, you MUST write the answer as an integer after '####'.
-2. DIRECTLY and ONLY writing a program with the PYTHON programming language. The function must be named solution() without any input arguments. At the end, you MUST return an single value.
+Choose between either Code or CoT as a way to solve a given task:
+1. CoT: Think step-by-step. Derive and go through the logical steps in order to arrive at the final answer. At the end, you MUST write the answer after '####'.
+2. Code: DIRECTLY and ONLY writing a program with the PYTHON programming language. The function must be named solution() without any input arguments. At the end, you MUST return an single value.\
 """,
     "routing-code-first" : """\
-Choose to solve the problem by either:
-1. DIRECTLY and ONLY writing a program with the PYTHON programming language. The function must be named solution() without any input arguments. At the end, you MUST return an single value.
-2. Thinking step-by-step. Go through the reasoning in order to derive the final answer. At the end, you MUST write the answer as an integer after '####'.
+Choose between either Code or CoT as a way to solve a given task:
+1. Code: DIRECTLY and ONLY writing a program with the PYTHON programming language. The function must be named solution() without any input arguments. At the end, you MUST return an single value.
+2. CoT: Think step-by-step. Derive and go through the logical steps in order to arrive at the final answer. At the end, you MUST write the answer after '####'.\
 """,
 }
