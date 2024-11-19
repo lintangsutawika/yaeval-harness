@@ -6,6 +6,7 @@ import jsonlines
 
 from tqdm import tqdm
 from typing import List, Tuple
+from torch.utils.data import DataLoader
 
 from codethink.utils import zeno_upload
 
@@ -18,9 +19,12 @@ class EvaluateSystem:
                  model_system,
                  run_name=None,
                  output_path=None,
+                 run_args=None,
+                 batch_size=1,
                  **kwargs
                  ):
         self.dataset = dataset
+        self.data_loader = DataLoader(self.dataset, batch_size=batch_size)
         self.model_system = model_system
         if run_name is None:
             current_time = datetime.datetime.now()
@@ -28,6 +32,7 @@ class EvaluateSystem:
         else:
             self.run_name = run_name
         self.output_path = output_path
+        self.run_args = run_args
 
     def run(self, temperature=0.1, top_p=1.0, repeat=1, seed=None):
         result_dict = {
@@ -51,47 +56,53 @@ class EvaluateSystem:
             "total_tokens": [],
         }
         output_json = []
-        for idx, sample in enumerate(self.dataset):
+        idx = 0
+        for sample in tqdm(self.data_loader):
             user_input, ground_truth = sample
 
-            ans, output_dict = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
+            ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
             # try:
             #     ans = type(ground_truth)(ans)
             # except:
             #     ans = str(ans)
 
-            score = self.dataset.eval(ans, ground_truth)
+            for ans, gt, inp, output_dict in zip(ans_list, ground_truth, user_input, output_dict_list):
+                score = self.dataset.eval(ans, gt)
+                gt = str(gt.item())
 
-            logger.info(f"\nId: {idx}, Score: {score}, Prediction: {ans}, Ground Truth: {ground_truth}")
-            result_dict["n_samples"] += 1
-            result_dict["score"] += score
-            result_dict["duration"] += output_dict["duration"]
-            result_dict["input_tokens"] += output_dict["input_len"]
-            result_dict["output_tokens"] += output_dict["output_len"]
-            result_dict["total_tokens"] += (output_dict["input_len"] + output_dict["output_len"])
-            output_json.append(
-                {
-                    "idx": idx,
-                    "score": score,
-                    "answer": ans,
-                    "ground_truth": ground_truth,
-                    "user_input": user_input,
-                    **output_dict,
-                }
-            )
+                # if self.verbose:
+                logger.info(f"\nId: {idx}, Score: {score}, Prediction: {ans}, Ground Truth: {gt}")
+                result_dict["n_samples"] += 1
+                result_dict["score"] += score
+                result_dict["duration"] += output_dict["duration"]
+                result_dict["input_tokens"] += output_dict["input_len"]
+                result_dict["output_tokens"] += output_dict["output_len"]
+                result_dict["total_tokens"] += (output_dict["input_len"] + output_dict["output_len"])
+                output_json.append(
+                    {
+                        "idx": idx,
+                        "score": score,
+                        "answer": ans,
+                        "ground_truth": gt,
+                        "user_input": inp,
+                        **output_dict,
+                    }
+                )
 
-            data_dict["idx"].append(int(idx))
-            data_dict["answer"].append(ans)
-            data_dict["system_output"].append(output_dict["system_output"][0])
-            data_dict["ground_truth"].append(ground_truth)
-            data_dict["user_input"].append(user_input)
-            data_dict["score"].append(score)
-            data_dict["duration"].append(output_dict["duration"])
-            data_dict["input_tokens"].append(output_dict["input_len"])
-            data_dict["output_tokens"].append(output_dict["output_len"])
-            data_dict["total_tokens"].append(output_dict["input_len"] + output_dict["output_len"])
-        # zeno_upload(self.run_name, data_dict)
+                data_dict["idx"].append(int(idx))
+                data_dict["answer"].append(ans)
+                data_dict["system_output"].append(output_dict["system_output"][0])
+                data_dict["ground_truth"].append(gt)
+                data_dict["user_input"].append(user_input)
+                data_dict["score"].append(score)
+                data_dict["duration"].append(output_dict["duration"])
+                data_dict["input_tokens"].append(output_dict["input_len"])
+                data_dict["output_tokens"].append(output_dict["output_len"])
+                data_dict["total_tokens"].append(output_dict["input_len"] + output_dict["output_len"])
+                idx += 1
+            # zeno_upload(self.run_name, data_dict)
 
+        result_dict = {**self.run_args, **result_dict}
         result_dict["avg_score"] = result_dict["score"]/result_dict["n_samples"]
         result_dict["avg_duration"] = result_dict["duration"]/result_dict["n_samples"]
         result_dict["avg_input_tokens"] = result_dict["input_tokens"]/result_dict["n_samples"]
@@ -100,9 +111,9 @@ class EvaluateSystem:
         logger.info(f"{self.run_name} complete")
         logger.info("Score: {}".format(result_dict["avg_score"]))
 
-        run_path = os.path.join(self.output_path, self.run_name)
-        os.makedirs(run_path, exist_ok=True)
         if self.output_path is not None:
+            run_path = os.path.join(self.output_path, self.run_name)
+            os.makedirs(run_path, exist_ok=True)
             result_file = os.path.join(run_path, "result.json")
             with open(result_file, 'w', encoding='utf-8') as file:
                 json.dump(result_dict, file, ensure_ascii=False, indent=4)
