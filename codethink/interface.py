@@ -26,8 +26,8 @@ def extract_regex(answer: str, fallback: str, regex: List):
 
 def extract_fn(answer: str, fallback: str):
     answer = answer.split('####')[-1].strip()
-    # for char in [',', '$', '%', 'g']:
-    #     answer = answer.replace(char, '')
+    for char in [',', '$', '%', 'g']:
+        answer = answer.replace(char, '')
     try:
         return answer
     except:
@@ -111,7 +111,8 @@ class HFProgramInterface(pal.interface.ProgramChatInterface):
             )
         except:
             message = self.system_message+"\n\n"+prompt
-        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop="\n```", include_stop_str_in_output=True)
+        # sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop="\n```", include_stop_str_in_output=True)
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop=["```\n", "``` \n"], include_stop_str_in_output=True)
         start_time = time.time()
         output = self.generate(message, sampling_params)
         program, (input_len, output_len) = get_tokens(output)
@@ -214,6 +215,8 @@ class SolverInterface:
             gens = gens.split('```python')[1].split('```')[0]
         elif '```' in gens:
             gens = gens.split('```')[1].split('```')[0]
+        elif self.answer_expr in gens:
+            gens = "def "+self.answer_expr+f"{self.answer_expr}".join(gens.split(self.answer_expr)[1:])
         else:
             return False
             
@@ -234,8 +237,9 @@ class SolverInterface:
             )
         except:
             message = self.system_message+"\n\n"+prompt
-        # sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
-        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop=self.stop, include_stop_str_in_output=True)
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
+        # sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop=self.stop, include_stop_str_in_output=True)
+        # sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop=["```\n", "``` \n"], include_stop_str_in_output=True)
         start_time = time.time()
 
         all_result = []
