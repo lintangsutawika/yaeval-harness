@@ -133,8 +133,8 @@ class TransformedDataset(Dataset):
 
     def __getitem__(self, i):
         return (
-            self.dataset[self.test_split][i]["__input__"],
-            self.dataset[self.test_split][i]["__output__"]
+            str(self.dataset[self.test_split][i]["__input__"]),
+            str(self.dataset[self.test_split][i]["__output__"])
         )
 
 
