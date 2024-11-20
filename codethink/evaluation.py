@@ -61,14 +61,9 @@ class EvaluateSystem:
             user_input, ground_truth = sample
 
             ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
-            # try:
-            #     ans = type(ground_truth)(ans)
-            # except:
-            #     ans = str(ans)
 
             for ans, gt, inp, output_dict in zip(ans_list, ground_truth, user_input, output_dict_list):
                 score = self.dataset.eval(ans, gt)
-                gt = str(gt.item())
 
                 # if self.verbose:
                 logger.info(f"\nId: {idx}, Score: {score}, Prediction: {ans}, Ground Truth: {gt}")
@@ -82,8 +77,8 @@ class EvaluateSystem:
                     {
                         "idx": idx,
                         "score": score,
-                        "answer": ans,
                         "ground_truth": gt,
+                        "answer": ans,
                         "user_input": inp,
                         **output_dict,
                     }
