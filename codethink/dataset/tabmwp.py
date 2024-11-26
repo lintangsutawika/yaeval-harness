@@ -9,13 +9,13 @@ except:
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 def tabmwp_input(x):
-    return "Table:\n"+x["table"]+"\nQuestion:\n"+x["question"].strip()+"\nAnswer:"
+    return "Table:\n"+x['table']+"\nQuestion:\n"+x['question'].strip()+"\nAnswer:"
 
 def tabmwp_output(x):
     return x["answer"]
 
 def tabmwp_fewshot_output(x):
-    return f"Let's think step by step. {x["solution"]} #### {x["answer"]}"
+    return f"Let's think step by step. {x['solution']} #### {x['answer']}"
 
 def tabmwp_eval(prediction, ground_truth):
     try:

@@ -45,7 +45,7 @@ def gsm8k_input(x):
 def gsm8k_output(x):
     answer = x["answer"]
     answer = answer.split("#### ")[-1]
-    answer = float(re.findall(r'\d+', answer)[0])
+    answer = re.findall(r'\d+', answer)[0]
     return answer
 
 def gsm8k_eval(prediction, ground_truth):

@@ -11,7 +11,9 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 def arc_input(x):
     choices = x["choices"]
     choice_list = [f"{a}. {b}" for a,b in list(zip(choices["label"], choices["text"]))]
-    return f"Answer with either A, B, C, or D.\nQuestion:\n{x["question"]}\n{"\n".join(choice_list)}\nAnswer:"
+    question = x['question']
+    choice_string = '\n'.join(choice_list)
+    return f"Answer with either A, B, C, or D.\nQuestion:\n{question}\n{choice_string}\nAnswer:"
 
 def arc_output(x):
     return x["answerKey"]

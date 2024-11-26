@@ -11,7 +11,7 @@ except:
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 def algebra_input(x):
-    return "Question:\n"+x["question"]+"\nAnswer:"
+    return "Question:\n"+x['question']+"\nAnswer:"
 
 def algebra_output(x):
     return x["final_answer"]
