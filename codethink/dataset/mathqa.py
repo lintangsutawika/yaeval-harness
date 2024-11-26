@@ -8,7 +8,7 @@ except:
     from data import TransformedDataset
 
 def mathqa_input(x):
-    return f"Question:\n{x["Problem"]}\n{x["options"]}\nAnswer:"
+    return f"Question:\n{x['Problem']}\n{x['options']}\nAnswer:"
 
 def match_decimals(prediction, ground_truth):
     reversed_number = str(ground_truth)[::-1]
@@ -48,7 +48,7 @@ def mathqa_output(x):
     return " OR ".join([x["correct"], numeric_answer, f"{answer} ) {numeric_answer}"])
 
 def mathqa_fewshot_output(x):
-    return f"Let's think step by step. {x["Rationale"]} #### {x["correct"]}"
+    return f"Let's think step by step. {x['Rationale']} #### {x['correct']}"
 
 def mathqa_eval(prediction, ground_truth):
 

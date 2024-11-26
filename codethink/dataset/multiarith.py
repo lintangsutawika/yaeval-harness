@@ -6,7 +6,7 @@ except:
     from data import TransformedDataset
 
 def multiarith_input(x):
-    return "Question:\n"+x["question"].strip()+"\nAnswer:"
+    return "Question:\n"+x['question'].strip()+"\nAnswer:"
 
 def multiarith_output(x):
     return x["final_ans"]
