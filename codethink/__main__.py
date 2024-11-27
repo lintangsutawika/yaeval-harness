@@ -1,3 +1,4 @@
+import os
 import re
 import logging
 
@@ -8,6 +9,7 @@ logging.basicConfig(
 )
 
 import argparse
+import importlib.util
 
 from tqdm import tqdm
 from datasets import load_dataset
@@ -138,10 +140,11 @@ def setup_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
     )
-    # parser.add_argument(
-    #     "--alt_prompt",
-    #     action="store_true",
-    # )
+    parser.add_argument(
+        "--include_path",
+        default=None,
+        type=str,
+    )
     return parser
 
 def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
@@ -154,6 +157,29 @@ def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
             else:
                 continue
     return parser.parse_args()
+
+def load_script(module_name, script_path):
+    if not os.path.isfile(script_path):
+        raise FileNotFoundError(f"Script not found at {script_path}")
+
+    module_name = os.path.splitext(os.path.basename(script_path))[0]
+    spec = importlib.util.spec_from_file_location(module_name, script_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+def dynamic_import(module_name, script_path):
+    abs_script_path = os.path.abspath(script_path)
+
+    if os.path.isdir(abs_script_path) and os.path.isfile(os.path.join(abs_script_path, "__init__.py")):
+        package_name = os.path.basename(abs_script_path)
+        parent_dir = os.path.dirname(abs_script_path)
+        package = importlib.import_module(package_name)
+
+    if not hasattr(package, module_name):
+        raise AttributeError(f"Module '{module_name}' not found in package '{package_name}'.")
+    
+    return getattr(package, module_name)
 
 def main():
     parser = setup_parser()
@@ -193,6 +219,10 @@ def main():
         trust_remote_code=args.trust_remote_code,
         # model_kwargs=simple_parse_args_string(args.model_kwargs),
         )
+
+    if args.include_path is not None:
+        ADDITIONAL_DATASET = dynamic_import("DATASET", args.include_path)
+        DATASET = {**ADDITIONAL_DATASET, **DATASET}
 
     eval_dataset = DATASET[args.task](
         num_fewshot=args.num_fewshot,
