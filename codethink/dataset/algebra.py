@@ -40,7 +40,7 @@ AlgebraDataset = partial(
     input_text=algebra_input,
     output_text=algebra_output,
     # fewshot_output_text=algebra_fewshot_output,
-    eval=algebra_eval,
+    evaluation=algebra_eval,
     test_split="test",
     fewshot_split="test",
 )

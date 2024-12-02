@@ -36,8 +36,9 @@ ARCDataset = partial(
     input_text=arc_input,
     output_text=arc_output,
     # fewshot_output_text=arc_fewshot_output,
-    eval=arc_eval,
-    test_split="test",
+    evaluation=arc_eval,
+    # test_split="test",
+    test_split="train",
 )
 
 if __name__ == "__main__":

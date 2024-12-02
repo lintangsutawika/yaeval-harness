@@ -68,9 +68,10 @@ GSM8KDataset = partial(
     output_text=gsm8k_output,
     fewshot_input_text=gsm8k_fewshot_input,
     fewshot_output_text=gsm8k_fewshot_output,
-    eval=gsm8k_eval,
-    test_split="test",
-    fewshot_split="train",
+    evaluation=gsm8k_eval,
+    # test_split="test",
+    test_split="train",
+    # fewshot_split="train",
 )
 
 if __name__ == "__main__":

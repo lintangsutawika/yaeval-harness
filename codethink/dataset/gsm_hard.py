@@ -65,7 +65,7 @@ GSMHardDataset = partial(
     output_text=gsm8k_output,
     # fewshot_input_text=gsm8k_fewshot_input,
     # fewshot_output_text=gsm8k_fewshot_output,
-    eval=gsm8k_eval,
+    evaluation=gsm8k_eval,
     test_split="train",
     # fewshot_split="train",
 )

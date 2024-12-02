@@ -81,7 +81,7 @@ MathQADataset = partial(
     input_text=mathqa_input,
     output_text=partial(mathqa_output),
     fewshot_output_text=mathqa_fewshot_output,
-    eval=mathqa_eval,
+    evaluation=mathqa_eval,
     test_split="test",
     fewshot_split="train",
 )
@@ -92,7 +92,7 @@ MathQADataset = partial(
 #     input_text=mathqa_input,
 #     output_text=partial(mathqa_output, letter=True),
 #     fewshot_output_text=mathqa_fewshot_output,
-#     eval=mathqa_eval,
+#     evaluation=mathqa_eval,
 #     test_split="test",
 #     fewshot_split="train",
 # )
@@ -103,7 +103,7 @@ MathQADataset = partial(
 #     input_text=mathqa_input,
 #     output_text=partial(mathqa_output, letter=False),
 #     fewshot_output_text=mathqa_fewshot_output,
-#     eval=mathqa_eval,
+#     evaluation=mathqa_eval,
 #     test_split="test",
 #     fewshot_split="train",
 # )

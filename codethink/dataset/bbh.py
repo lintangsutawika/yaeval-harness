@@ -82,7 +82,7 @@ for task in bbh_tasks:
         input_text=bbh_input,
         output_text=bbh_output,
         # fewshot_output_text=bbh_fewshot_output,
-        eval=bbh_eval,
+        evaluation=bbh_eval,
         test_split="train",
         # fewshot_split="dev",
     )
