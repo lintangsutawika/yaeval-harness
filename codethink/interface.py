@@ -8,7 +8,7 @@ import transformers
 from typing import List
 from functools import partial
 
-import pal
+# import pal
 
 from vllm import LLM, SamplingParams, RequestOutput
 
@@ -176,6 +176,8 @@ class SolverInterface:
                  revision="main",
                  trust_remote_code=False,
                  use_system_role=False,
+                 max_model_len=8096,
+                 tensor_parallel_size=1,
                  **kwargs):
 
         self.model = model
@@ -186,10 +188,8 @@ class SolverInterface:
             self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(get_answer_symbol)])
         elif isinstance(get_answer_symbol, List):
             self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(pattern) for pattern in get_answer_symbol])
-        elif get_answer_symbol is False:
-            self.get_answer_symbol = partial(pass_fn, fallback=fallback)
         else:
-            self.get_answer_symbol = partial(extract_fn, fallback=fallback)
+            self.get_answer_symbol = partial(pass_fn, fallback=fallback)
         self.answer_expr = answer_expr
         self.fallback = fallback
         self.verbose = verbose
@@ -198,7 +198,9 @@ class SolverInterface:
         self.lm = LLM(
             model=self.model,
             revision=revision,
-            trust_remote_code=trust_remote_code,
+            max_model_len=max_model_len,
+            # trust_remote_code=trust_remote_code,
+            tensor_parallel_size=tensor_parallel_size
             )
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(
             self.model,
