@@ -29,7 +29,7 @@ CoinFlipDataset = partial(
     data_path="skrishna/coin_flip",
     input_text=coinflip_input,
     output_text=coinflip_output,
-    eval=coinflip_eval,
+    evaluation=coinflip_eval,
     test_split="test",
     fewshot_split="train",
 )

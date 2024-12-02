@@ -31,7 +31,7 @@ MultiArithDataset = partial(
     input_text=multiarith_input,
     output_text=multiarith_output,
     # fewshot_output_text=multiarith_fewshot_output,
-    eval=multiarith_eval,
+    evaluation=multiarith_eval,
     test_split="test",
     fewshot_split="train",
 )

@@ -1,6 +1,6 @@
 import random
 
-from typing import Union, Callable
+from typing import Union, Callable, Dict
 from functools import partial
 from torch.utils.data import Dataset
 
@@ -11,7 +11,7 @@ class TransformedDataset(Dataset):
                  data_path: str,
                  data_name: str=None,
                  name: str=None,
-                 eval: Callable=None,
+                 evaluation: Union[str, Dict[str, Callable]]=None,
                  input_text: Union[str, Callable]=None,
                  output_text: Union[str, Callable]=None,
                  test_split: str=None,
@@ -23,6 +23,7 @@ class TransformedDataset(Dataset):
                  fewshot_delimiter: str="\n\n",
                  answer_delimiter: str="\n",
                  n_samples: Union[int, float]=None,
+                 data_kwargs: dict=None,
                  ):
         
         if name is None:
@@ -33,15 +34,24 @@ class TransformedDataset(Dataset):
         else:
             self.name = name
 
+        if data_kwargs is None:
+            data_kwargs = {}
+        
+        if "data_files" in data_kwargs:
+            data_name = data_kwargs["data_files"]
+            data_kwargs.pop("data_files")
+
         if data_path in ["json", "csv"]:
             self.dataset = load_dataset(
                 path=data_path,
                 data_files=data_name,
+                **data_kwargs
             )
         else:
             self.dataset = load_dataset(
                 path=data_path,
                 name=data_name,
+                **data_kwargs
             )
         self.test_split = test_split
         self.fewshot_split = fewshot_split
@@ -49,7 +59,10 @@ class TransformedDataset(Dataset):
         self.sampler = sampler
         self.fewshot_delimiter = fewshot_delimiter
         self.answer_delimiter = answer_delimiter
-        self.eval = eval
+        if isinstance(evaluation, Callable):
+            self.evaluation = {"score": evaluation}
+        else:
+            self.evaluation = evaluation
 
         self.use_fewshot_input = False
         if fewshot_input_text is not None:
@@ -126,7 +139,10 @@ class TransformedDataset(Dataset):
         return fewshot_samples
 
     def eval(self, prediction, ground_truth):
-        return self.eval(prediction, ground_truth)
+        # return self.eval(prediction, ground_truth)
+        return {
+            eval_name: eval_fn(prediction, ground_truth) for eval_name, eval_fn in self.evaluation.items()
+            }
 
     def __len__(self):
         return len(self.dataset[self.test_split])

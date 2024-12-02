@@ -71,7 +71,7 @@ FinQADataset = partial(
     input_text=finqa_input,
     output_text=finqa_output,
     # fewshot_output_text=finqa_fewshot_output,
-    eval=finqa_eval,
+    evaluation=finqa_eval,
     test_split="test",
 )
 

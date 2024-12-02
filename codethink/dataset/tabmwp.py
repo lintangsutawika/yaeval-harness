@@ -39,7 +39,7 @@ TabMWPDataset = partial(
     input_text=tabmwp_input,
     output_text=tabmwp_output,
     fewshot_output_text=tabmwp_fewshot_output,
-    eval=tabmwp_eval,
+    evaluation=tabmwp_eval,
     test_split="test",
     fewshot_split="dev",
 )

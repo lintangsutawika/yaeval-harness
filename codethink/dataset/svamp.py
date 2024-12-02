@@ -29,7 +29,7 @@ SVAMPDataset = partial(
     input_text=svamp_input,
     output_text=svamp_output,
     fewshot_output_text=svamp_fewshot_output,
-    eval=svamp_eval,
+    evaluation=svamp_eval,
     test_split="test",
     fewshot_split="train",
 )
