@@ -1,5 +1,7 @@
 import os
 import re
+import sys
+import json
 import logging
 
 logging.basicConfig(
@@ -16,7 +18,7 @@ from datasets import load_dataset
 
 from codethink.utils import simple_parse_args_string
 from codethink import INTERFACE, SYSTEM_MESSAGE
-from codethink.dataset import DATASET
+from codethink.dataset import DATASET as TASK_LIST
 from codethink.evaluation import EvaluateSystem
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,12 @@ def setup_parser() -> argparse.ArgumentParser:
         type=str,
         default="solution()",
         help="Name of function to execute",
+    )
+    parser.add_argument(
+        "--get_answer_symbol",
+        type=str,
+        default=None,
+        help="Postprocessing answer",
     )
     parser.add_argument(
         "--verbose", "-v",
@@ -107,6 +115,18 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Number of seed",
     )
     parser.add_argument(
+        "--max_model_len",
+        default=4096,
+        type=int,
+        help="Max model lengths",
+    )
+    parser.add_argument(
+        "--tensor_parallel_size",
+        default=1,
+        type=int,
+        help="tensor parallel size",
+    )
+    parser.add_argument(
         "--task",
         default="gsm8k",
         type=str,
@@ -134,6 +154,17 @@ def setup_parser() -> argparse.ArgumentParser:
         default=1,
         type=int,
         help="Batch size",
+    )
+    parser.add_argument(
+        "--use_output_path_only",
+        action="store_true",
+        help="directly save output to output path",
+    )
+    parser.add_argument(
+        "--data_kwargs",
+        default=None,
+        type=str,
+        help="Data key args",
     )
     parser.add_argument(
         "--trust_remote_code",
@@ -174,6 +205,9 @@ def dynamic_import(module_name, script_path):
     if os.path.isdir(abs_script_path) and os.path.isfile(os.path.join(abs_script_path, "__init__.py")):
         package_name = os.path.basename(abs_script_path)
         parent_dir = os.path.dirname(abs_script_path)
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+
         package = importlib.import_module(package_name)
 
     if not hasattr(package, module_name):
@@ -214,20 +248,32 @@ def main():
         model=args.model_str,
         system_message=system_message,
         get_answer_expr=args.get_answer_expr,
+        get_answer_symbol=args.get_answer_symbol,
         verbose=args.verbose,
         use_system_role=args.use_system_role,
         trust_remote_code=args.trust_remote_code,
+        max_model_len=args.max_model_len,
+        tensor_parallel_size=args.tensor_parallel_size,
         # model_kwargs=simple_parse_args_string(args.model_kwargs),
         )
 
+    
     if args.include_path is not None:
-        ADDITIONAL_DATASET = dynamic_import("DATASET", args.include_path)
-        DATASET = {**ADDITIONAL_DATASET, **DATASET}
+        ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
+        ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
+    else:
+        ALL_TASK_LIST = TASK_LIST
 
-    eval_dataset = DATASET[args.task](
+    if args.data_kwargs is not None:
+        data_kwargs = eval(args.data_kwargs)
+    else:
+        data_kwargs = None
+
+    eval_dataset = ALL_TASK_LIST[args.task](
         num_fewshot=args.num_fewshot,
         sampler=None,
         n_samples=args.n_samples,
+        data_kwargs=data_kwargs,
     )
 
     evaluator = EvaluateSystem(
@@ -237,6 +283,7 @@ def main():
         output_path=args.output_path,
         run_args=vars(args),
         batch_size=args.batch_size,
+        use_run_name=False if args.use_output_path_only == True else True,
     )
 
     evaluator.run(temperature=args.temperature, top_p=args.top_p, repeat=args.repeat, seed=args.seed)
