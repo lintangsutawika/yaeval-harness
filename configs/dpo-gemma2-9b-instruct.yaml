@@ -1,0 +1,85 @@
+# Config for multi-device LoRA DPO alignment in lora_dpo_distributed.py
+# using a Llama2 7B model
+#
+# This config assumes that you've run the following command before launching
+# this run:
+#   tune download meta-llama/Llama-2-7b-hf --output-dir /tmp/Llama-2-7b-hf --hf-token <HF_TOKEN>
+#
+# To launch on 2 devices, run the following command from root:
+#   tune run --nnodes 1 --nproc_per_node 2 lora_dpo_distributed --config llama2/7B_lora_dpo
+#
+# You can add specific overrides through the command line. For example
+# to override the checkpointer directory while launching training
+# you can run:
+#   tune run --nnodes 1 --nproc_per_node 2 lora_dpo_distributed --config llama2/7B_lora_dpo checkpointer.checkpoint_dir=<YOUR_CHECKPOINT_DIR>
+#
+# This config works best when the model is being fine-tuned on 2+ GPUs.
+# For single device LoRA DPO alignment please use 7B_lora_dpo_single_device.yaml
+
+# Model Arguments
+model:
+  _component_: torchtune.models.gemma2.lora_gemma2_9b
+  lora_attn_modules: ['q_proj', 'k_proj', 'v_proj']
+  apply_lora_to_mlp: True
+  lora_rank: 64
+  lora_alpha: 128
+  lora_dropout: 0.0
+
+# Tokenizer
+tokenizer:
+  _component_: torchtune.models.gemma.gemma_tokenizer
+  path: /data/user_data/lsutawik/codethink/MODELS/gemma-2-9b-it/tokenizer.model
+  max_seq_len: 4096
+
+checkpointer:
+  _component_: torchtune.training.FullModelHFCheckpointer
+  checkpoint_dir: /data/user_data/lsutawik/codethink/MODELS/gemma-2-9b-it
+  checkpoint_files:
+    filename_format: model-{}-of-{}.safetensors
+    max_filename: "00004"
+  recipe_checkpoint: null
+  adapter_checkpoint: null
+  output_dir: /data/user_data/lsutawik/codethink/OUTPUTS/DPO-gemma-2-9b-it/
+  model_type: GEMMA2
+  safe_serialization: True
+resume_from_checkpoint: False
+save_adapter_weights_only: False
+
+# Dataset and Sampler
+dataset:
+  _component_: codethink.dataset.code_or_natlang_paired_dataset
+  train_on_input: True
+seed: null
+shuffle: True
+
+# Optimizer and Scheduler
+batch_size: 1
+epochs: 5
+optimizer:
+  _component_: torch.optim.AdamW
+  fused: True
+  weight_decay: 0.05
+  lr: 5e-4
+lr_scheduler:
+  _component_: torchtune.training.lr_schedulers.get_cosine_schedule_with_warmup
+  num_warmup_steps: 100
+loss:
+  _component_: torchtune.rlhf.loss.DPOLoss
+  beta: 0.1
+  label_smoothing: 0
+max_steps_per_epoch: 25
+gradient_accumulation_steps: 128
+
+
+# Logging
+output_dir: /data/user_data/lsutawik/codethink/LOGS/dpo-gemma2-9b-instruct
+metric_logger:
+  _component_: torchtune.training.metric_logging.DiskLogger
+  log_dir: ${output_dir}
+log_every_n_steps: 10
+log_peak_memory_stats: False
+
+# Environment
+device: cuda
+dtype: bf16
+enable_activation_checkpointing: True
