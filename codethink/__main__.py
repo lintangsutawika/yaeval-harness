@@ -146,7 +146,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--n_samples",
         default=None,
-        type=int,
+        type=str,
         help="Number of samples to infer on",
     )
     parser.add_argument(
@@ -165,6 +165,12 @@ def setup_parser() -> argparse.ArgumentParser:
         default=None,
         type=str,
         help="Data key args",
+    )
+    parser.add_argument(
+        "--task_kwargs",
+        default=None,
+        type=str,
+        help="task related args",
     )
     parser.add_argument(
         "--trust_remote_code",
@@ -269,11 +275,17 @@ def main():
     else:
         data_kwargs = None
 
+    if args.task_kwargs is not None:
+        task_kwargs = eval(args.task_kwargs)
+    else:
+        task_kwargs = {}
+
     eval_dataset = ALL_TASK_LIST[args.task](
         num_fewshot=args.num_fewshot,
         sampler=None,
         n_samples=args.n_samples,
         data_kwargs=data_kwargs,
+        **task_kwargs,
     )
 
     evaluator = EvaluateSystem(
@@ -283,6 +295,7 @@ def main():
         output_path=args.output_path,
         run_args=vars(args),
         batch_size=args.batch_size,
+        verbose=args.verbose,
         use_run_name=False if args.use_output_path_only == True else True,
     )
 
