@@ -47,28 +47,29 @@ save_adapter_weights_only: False
 
 # Dataset and Sampler
 dataset:
-  _component_: codethink.dataset.code_or_natlang_paired_dataset
+  # _component_: codethink.dataset.code_or_natlang_paired_dataset
+  _component_: codethink.dataset.mathinstruct_preference
   train_on_input: True
 seed: null
 shuffle: True
 
 # Optimizer and Scheduler
-batch_size: 1
-epochs: 5
+batch_size: 2
+epochs: 10
 optimizer:
   _component_: torch.optim.AdamW
   fused: True
   weight_decay: 0.05
-  lr: 5e-4
+  lr: 5e-7
 lr_scheduler:
   _component_: torchtune.training.lr_schedulers.get_cosine_schedule_with_warmup
-  num_warmup_steps: 100
+  num_warmup_steps: 580
 loss:
   _component_: torchtune.rlhf.loss.DPOLoss
   beta: 0.1
   label_smoothing: 0
-max_steps_per_epoch: 25
-gradient_accumulation_steps: 128
+max_steps_per_epoch: 580
+gradient_accumulation_steps: 2
 
 
 # Logging
