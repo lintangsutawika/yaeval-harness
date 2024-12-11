@@ -12,7 +12,7 @@ def aqua_output(x):
     return x["Answer"]
 
 def aqua_fewshot_output(x):
-    return f"Let's think step by step. {x["rationale"]} #### {x["correct"]}"
+    return f"Let's think step by step. {x['rationale']} #### {x['correct']}"
 
 AQUADataset = partial(
     TransformedDataset,

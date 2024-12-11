@@ -24,10 +24,12 @@ def finqa_output(x):
 #     return f"Let's think step by step. {x["solution"]} #### {x["answer"]}"
 
 def match_decimals(prediction, ground_truth):
-    decimal_places = str(ground_truth)[::-1].find('.')
+    reversed_number = str(ground_truth)[::-1]
+    decimal_places = reversed_number.find('.')
     decimal_places = decimal_places if decimal_places != -1 else 0
+    if decimal_places == 1 and reversed_number[0] == "0":
+        decimal_places = 0
     rounded_prediction = round(prediction, decimal_places)
-    
     return rounded_prediction
 
 
@@ -46,8 +48,8 @@ def finqa_eval(prediction, ground_truth):
             prediction = float(prediction)
             if "%" in ground_truth:
                 ground_truth = ground_truth.replace("%", "")
-                if prediction < 0:
-                    prediction * 100    
+                if prediction < 1.0:
+                    prediction = prediction * 100    
                 
             ground_truth = float(ground_truth)
             prediction = match_decimals(prediction, ground_truth)
@@ -69,7 +71,7 @@ FinQADataset = partial(
     input_text=finqa_input,
     output_text=finqa_output,
     # fewshot_output_text=finqa_fewshot_output,
-    eval=finqa_eval,
+    evaluation=finqa_eval,
     test_split="test",
 )
 

@@ -11,7 +11,7 @@ except:
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 def algebra_input(x):
-    return "Question:\n"+x["question"]+"\nAnswer:"
+    return "Question:\n"+x['question']+"\nAnswer:"
 
 def algebra_output(x):
     return x["final_answer"]
@@ -40,7 +40,7 @@ AlgebraDataset = partial(
     input_text=algebra_input,
     output_text=algebra_output,
     # fewshot_output_text=algebra_fewshot_output,
-    eval=algebra_eval,
+    evaluation=algebra_eval,
     test_split="test",
     fewshot_split="test",
 )

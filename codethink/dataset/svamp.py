@@ -10,7 +10,7 @@ def svamp_output(x):
     return x["Answer"]
 
 def svamp_fewshot_output(x):
-    return f"Let's think step by step, this is {x["Type"].lower()} problem. So we could write this as {x["Equation"]}. #### {x["Answer"]}"
+    return f"Let's think step by step, this is {x['Type'].lower()} problem. So we could write this as {x['Equation']}. #### {x['Answer']}"
 
 def svamp_eval(prediction, ground_truth):
     try:
@@ -29,7 +29,7 @@ SVAMPDataset = partial(
     input_text=svamp_input,
     output_text=svamp_output,
     fewshot_output_text=svamp_fewshot_output,
-    eval=svamp_eval,
+    evaluation=svamp_eval,
     test_split="test",
     fewshot_split="train",
 )

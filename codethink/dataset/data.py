@@ -1,19 +1,23 @@
 import random
 
-from typing import Union, Callable
+from typing import Union, Callable, Dict
 from functools import partial
 from torch.utils.data import Dataset
 
 from datasets import load_dataset
+
+from .utils import extract_fn
 
 class TransformedDataset(Dataset):
     def __init__(self,
                  data_path: str,
                  data_name: str=None,
                  name: str=None,
-                 eval: Callable=None,
+                 evaluation: Union[str, Dict[str, Callable]]=None,
                  input_text: Union[str, Callable]=None,
                  output_text: Union[str, Callable]=None,
+                 preprocessing: Callable=None,
+                 postprocessing: Callable=extract_fn,
                  test_split: str=None,
                  fewshot_input_text: Union[str, Callable]=None,
                  fewshot_output_text: Union[str, Callable]=None,
@@ -23,6 +27,7 @@ class TransformedDataset(Dataset):
                  fewshot_delimiter: str="\n\n",
                  answer_delimiter: str="\n",
                  n_samples: Union[int, float]=None,
+                 data_kwargs: dict=None,
                  ):
         
         if name is None:
@@ -33,15 +38,24 @@ class TransformedDataset(Dataset):
         else:
             self.name = name
 
+        if data_kwargs is None:
+            data_kwargs = {}
+        
+        if "data_files" in data_kwargs:
+            data_name = data_kwargs["data_files"]
+            data_kwargs.pop("data_files")
+
         if data_path in ["json", "csv"]:
             self.dataset = load_dataset(
                 path=data_path,
                 data_files=data_name,
+                **data_kwargs
             )
         else:
             self.dataset = load_dataset(
                 path=data_path,
                 name=data_name,
+                **data_kwargs
             )
         self.test_split = test_split
         self.fewshot_split = fewshot_split
@@ -49,7 +63,14 @@ class TransformedDataset(Dataset):
         self.sampler = sampler
         self.fewshot_delimiter = fewshot_delimiter
         self.answer_delimiter = answer_delimiter
-        self.eval = eval
+        if isinstance(evaluation, Callable):
+            self.evaluation = {"score": evaluation}
+        else:
+            self.evaluation = evaluation
+        if preprocessing is not None:
+            self.dataset = preprocessing(self.dataset)
+
+        self.postprocessing = postprocessing
 
         self.use_fewshot_input = False
         if fewshot_input_text is not None:
@@ -81,11 +102,25 @@ class TransformedDataset(Dataset):
         for split in all_split:
             
             if n_samples is not None:
+                try:
+                    n_samples = eval(n_samples)
+                except:
+                    pass
+
                 if isinstance(n_samples, int):
                     self.dataset[split] = self.dataset[split].select(range(n_samples))
                 elif isinstance(n_samples, float):
                     n_samples = int(len(self.dataset[split])*n_samples)
                     self.dataset[split] = self.dataset[split].select(range(n_samples))
+                elif isinstance(n_samples, str):
+                    start_idx, stop_idx = n_samples.split(":")
+                    if start_idx == "":
+                        n_samples = list(range(0,int(stop_idx)))
+                    elif stop_idx == "":
+                        n_samples = list(range(int(start_idx),int(len(self.dataset[split]))))
+                    else:
+                        n_samples = list(range(int(start_idx),int(stop_idx)))
+                    self.dataset[split] = self.dataset[split].select(n_samples)
 
             if self.use_fewshot_input:
                 self.dataset[split] = self.dataset[split].map(partial(_transform, fn=fewshot_input_text, feature="__fewshot_input__"))
@@ -125,16 +160,25 @@ class TransformedDataset(Dataset):
             )
         return fewshot_samples
 
+    def extract_answer(self, prediction):
+        if self.postprocessing is None:
+            return prediction
+        else:
+            return self.postprocessing(prediction)
+
     def eval(self, prediction, ground_truth):
-        return self.eval(prediction, ground_truth)
+        # return self.eval(prediction, ground_truth)
+        return {
+            eval_name: eval_fn(prediction, ground_truth) for eval_name, eval_fn in self.evaluation.items()
+            }
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.dataset[self.test_split])
 
     def __getitem__(self, i):
         return (
-            self.dataset[self.test_split][i]["__input__"],
-            self.dataset[self.test_split][i]["__output__"]
+            str(self.dataset[self.test_split][i]["__input__"]),
+            str(self.dataset[self.test_split][i]["__output__"])
         )
 
 

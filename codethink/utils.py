@@ -1,3 +1,5 @@
+import pandas as pd
+# from zeno_client import ZenoClient, ZenoMetric
 # TODO: Function to fill in results to a csv or google spreadsheet
 
 
@@ -40,3 +42,37 @@ def calculate_tokens(tokens):
         num_tokens = len(i_tokens + o_tokens)
 
     return num_tokens
+
+
+def zeno_upload(run_name, result_dict, metric_column="score"):
+
+
+    client = ZenoClient("zen_ItYuaijqhVoxmHR_ScDYpM43OBvq0eO1dw7FrE8o9gI")
+    df = pd.DataFrame(data=result_dict)
+
+    # Create a project.
+    project = client.create_project(
+        name=run_name,
+        view={
+            "data": {
+                "type": "text"
+            },
+            "label": {
+                "type": "text"
+            },
+            "output": {
+                "type": "code"
+            }
+        },
+        metrics=[
+            ZenoMetric(name="avg_score", type="mean", columns=["score"]),
+            ZenoMetric(name="avg_duration", type="mean", columns=["duration"]),
+            ZenoMetric(name="avg_input_tokens", type="mean", columns=["input_tokens"]),
+            ZenoMetric(name="avg_output_tokens", type="mean", columns=["output_tokens"]),
+            ZenoMetric(name="avg_total_tokens", type="mean", columns=["total_tokens"]),
+        ]
+    )
+
+    # Upload the data.
+    project.upload_dataset(df, id_column="idx", data_column="user_input", label_column="answer")
+    project.upload_system(df[["idx", "system_output"]], name="System A", id_column="idx", output_column="system_output")

@@ -8,9 +8,12 @@ from .tabmwp import TabMWPDataset
 from .bbh import BBHDataset
 from .gsm_hard import GSMHardDataset
 from .finqa import FinQADataset
-from .mathqa import MathQADataset
 from .coinflip import CoinFlipDataset
 from .algebra import AlgebraDataset
+from .arc_challenge import ARCDataset
+from .lastletterconcat import LastLetterConcatDataset
+from .mathqa import MathQADataset
+from .aime import AIMEDataset
 
 DATASET = {
     "svamp": SVAMPDataset,
@@ -23,5 +26,8 @@ DATASET = {
     "finqa": FinQADataset,
     "mathqa": MathQADataset,
     "coinflip": CoinFlipDataset,
+    "lastletterconcat": LastLetterConcatDataset,
     "algebra": AlgebraDataset,
+    "arc_challenge": ARCDataset,
+    "aime": AIMEDataset,
 }

@@ -1,3 +1,4 @@
+import re
 from functools import partial
 
 try:
@@ -5,38 +6,34 @@ try:
 except:
     from data import TransformedDataset
 
-def coinflip_input(x):
-    return "Question:\n"+x["inputs"].strip()+"\nAnswer:"
+def lastletterconcat_input(x):
+    return "Question:\n"+x['question'].strip()+"\nAnswer:"
 
-def coinflip_output(x):
-    return x["targets"]
+def lastletterconcat_output(x):
+    return x["answer"]
 
-def coinflip_eval(prediction, ground_truth):
+def lastletterconcat_eval(prediction, ground_truth):
     try:
-        if prediction == "True":
-            prediction = "yes"
-        elif prediction == "False":
-            prediction = "no"
-
+        prediction = "".join(re.findall(r'[a-zA-Z]', prediction)).lower()
         score = 1 if (prediction == ground_truth) else 0
     except Exception as e:
         score = 0
 
     return score
 
-CoinFlipDataset = partial(
+LastLetterConcatDataset = partial(
     TransformedDataset,
-    data_path="skrishna/coin_flip",
-    input_text=coinflip_input,
-    output_text=coinflip_output,
-    evaluation=coinflip_eval,
+    data_path="ChilleD/LastLetterConcat",
+    input_text=lastletterconcat_input,
+    output_text=lastletterconcat_output,
+    evaluation=lastletterconcat_eval,
     test_split="test",
     fewshot_split="train",
 )
 
 if __name__ == "__main__":
 
-    dataset = CoinFlipDataset(
+    dataset = LastLetterConcatDataset(
         num_fewshot=5,
         sampler=None,
     )

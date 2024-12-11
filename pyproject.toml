@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=40.8.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codethink"
+version = "0.0.1"
+authors = [
+    {name="Lintang Sutawika", email="lsutawik@andrew.cmu.edu"}
+]
+description = "For Evaluating Code Reasoning"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.8"
+license = { "text" = "MIT" }
+dependencies = [
+    "datasets",
+    "transformers",
+    "accelerate",
+    "tqdm",
+    "jsonlines",
+    "evaluate",
+]
+
+[tool.setuptools.packages.find]
+include = ["codethink*"]
+
+# required to include yaml files in pip installation
+[tool.setuptools.package-data]
+lm_eval = ["**/*.yaml", "tasks/**/*"]
+
+[project.scripts]
+codethink = "codethink.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/lintangsutawika/chain-of-code-thinking"
+Repository = "https://github.com/lintangsutawika/chain-of-code-thinking"
+
+[project.optional-dependencies]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+known-first-party = ["codethink"]
+
+[tool.ruff.lint.extend-per-file-ignores]
+# "__init__.py" = ["F401","F402","F403"]
+# "utils.py" = ["F401"]

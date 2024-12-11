@@ -1,16 +1,27 @@
+import os
 import re
+import sys
+import json
 import logging
+
+logging.basicConfig(
+    format="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
+    datefmt="%Y-%m-%d:%H:%M:%S",
+    level=logging.INFO,
+)
+
 import argparse
+import importlib.util
 
 from tqdm import tqdm
 from datasets import load_dataset
 
 from codethink.utils import simple_parse_args_string
-# from codethink.interface import HFProgramInterface, HFNatLangInterface
 from codethink import INTERFACE, SYSTEM_MESSAGE
-from codethink.dataset import DATASET
+from codethink.dataset import DATASET as TASK_LIST
 from codethink.evaluation import EvaluateSystem
 
+logger = logging.getLogger(__name__)
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
@@ -37,6 +48,12 @@ def setup_parser() -> argparse.ArgumentParser:
         type=str,
         default="solution()",
         help="Name of function to execute",
+    )
+    parser.add_argument(
+        "--get_answer_symbol",
+        type=str,
+        default=None,
+        help="Postprocessing answer",
     )
     parser.add_argument(
         "--verbose", "-v",
@@ -98,6 +115,24 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Number of seed",
     )
     parser.add_argument(
+        "--max_model_len",
+        default=4096,
+        type=int,
+        help="Max model lengths",
+    )
+    parser.add_argument(
+        "--data_parallel_size",
+        default=1,
+        type=int,
+        help="data parallel size",
+    )
+    parser.add_argument(
+        "--tensor_parallel_size",
+        default=1,
+        type=int,
+        help="tensor parallel size",
+    )
+    parser.add_argument(
         "--task",
         default="gsm8k",
         type=str,
@@ -117,7 +152,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--n_samples",
         default=None,
-        type=int,
+        type=str,
         help="Number of samples to infer on",
     )
     parser.add_argument(
@@ -127,14 +162,32 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Batch size",
     )
     parser.add_argument(
+        "--use_output_path_only",
+        action="store_true",
+        help="directly save output to output path",
+    )
+    parser.add_argument(
+        "--data_kwargs",
+        default=None,
+        type=str,
+        help="Data key args",
+    )
+    parser.add_argument(
+        "--task_kwargs",
+        default=None,
+        type=str,
+        help="task related args",
+    )
+    parser.add_argument(
         "--trust_remote_code",
         action="store_true",
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
     )
-    # parser.add_argument(
-    #     "--alt_prompt",
-    #     action="store_true",
-    # )
+    parser.add_argument(
+        "--include_path",
+        default=None,
+        type=str,
+    )
     return parser
 
 def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
@@ -148,19 +201,45 @@ def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
                 continue
     return parser.parse_args()
 
-if __name__ == "__main__":
+def load_script(module_name, script_path):
+    if not os.path.isfile(script_path):
+        raise FileNotFoundError(f"Script not found at {script_path}")
+
+    module_name = os.path.splitext(os.path.basename(script_path))[0]
+    spec = importlib.util.spec_from_file_location(module_name, script_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+def dynamic_import(module_name, script_path):
+    abs_script_path = os.path.abspath(script_path)
+
+    if os.path.isdir(abs_script_path) and os.path.isfile(os.path.join(abs_script_path, "__init__.py")):
+        package_name = os.path.basename(abs_script_path)
+        parent_dir = os.path.dirname(abs_script_path)
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+
+        package = importlib.import_module(package_name)
+
+    if not hasattr(package, module_name):
+        raise AttributeError(f"Module '{module_name}' not found in package '{package_name}'.")
+    
+    return getattr(package, module_name)
+
+def main():
     parser = setup_parser()
     args = parse_eval_args(parser)
 
-    logging.basicConfig(
-        format="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
-        datefmt="%Y-%m-%d:%H:%M:%S",
-        level=logging.INFO,
-    )
-    logger = logging.getLogger(__name__)
-
     run_name = args.run_name.replace("/", "-")
     logger.info(f"Run: {run_name}")
+    logger.info(
+        "\n{} Run Configuration {}\n{}\n{}".format(
+            "#"*33, "#"*33,
+            "\n".join([" "*(32-len(key))+f"{key}: {value}" for key, value in vars(args).items()]),
+            "#"*85,
+            )
+        )
 
     if args.trust_remote_code:
         logger.info(
@@ -188,16 +267,39 @@ if __name__ == "__main__":
         model=args.model_str,
         system_message=system_message,
         get_answer_expr=args.get_answer_expr,
+        get_answer_symbol=args.get_answer_symbol,
         verbose=args.verbose,
         use_system_role=args.use_system_role,
         trust_remote_code=args.trust_remote_code,
+        max_model_len=args.max_model_len,
+        tensor_parallel_size=args.tensor_parallel_size,
+        data_parallel_size=args.data_parallel_size,
         # model_kwargs=simple_parse_args_string(args.model_kwargs),
         )
 
-    eval_dataset = DATASET[args.task](
+    
+    if args.include_path is not None:
+        ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
+        ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
+    else:
+        ALL_TASK_LIST = TASK_LIST
+
+    if args.data_kwargs is not None:
+        data_kwargs = eval(args.data_kwargs)
+    else:
+        data_kwargs = None
+
+    if args.task_kwargs is not None:
+        task_kwargs = eval(args.task_kwargs)
+    else:
+        task_kwargs = {}
+
+    eval_dataset = ALL_TASK_LIST[args.task](
         num_fewshot=args.num_fewshot,
         sampler=None,
         n_samples=args.n_samples,
+        data_kwargs=data_kwargs,
+        **task_kwargs,
     )
 
     evaluator = EvaluateSystem(
@@ -207,6 +309,13 @@ if __name__ == "__main__":
         output_path=args.output_path,
         run_args=vars(args),
         batch_size=args.batch_size,
+        verbose=args.verbose,
+        use_run_name=False if args.use_output_path_only == True else True,
     )
 
     evaluator.run(temperature=args.temperature, top_p=args.top_p, repeat=args.repeat, seed=args.seed)
+
+
+if __name__ == "__main__":
+
+    main()

@@ -53,7 +53,7 @@ def gsm8k_eval(prediction, ground_truth):
         ground_truth = float(ground_truth)
         score = 1 if abs(prediction - ground_truth) < 1e-3 else 0
     except Exception as e:
-        print("Exception:", e)
+        # print("Exception:", e)
         score = 0
 
     return score
@@ -65,7 +65,7 @@ GSMHardDataset = partial(
     output_text=gsm8k_output,
     # fewshot_input_text=gsm8k_fewshot_input,
     # fewshot_output_text=gsm8k_fewshot_output,
-    eval=gsm8k_eval,
+    evaluation=gsm8k_eval,
     test_split="train",
     # fewshot_split="train",
 )
