@@ -121,6 +121,12 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Max model lengths",
     )
     parser.add_argument(
+        "--data_parallel_size",
+        default=1,
+        type=int,
+        help="data parallel size",
+    )
+    parser.add_argument(
         "--tensor_parallel_size",
         default=1,
         type=int,
@@ -227,6 +233,13 @@ def main():
 
     run_name = args.run_name.replace("/", "-")
     logger.info(f"Run: {run_name}")
+    logger.info(
+        "\n{} Run Configuration {}\n{}\n{}".format(
+            "#"*33, "#"*33,
+            "\n".join([" "*(32-len(key))+f"{key}: {value}" for key, value in vars(args).items()]),
+            "#"*85,
+            )
+        )
 
     if args.trust_remote_code:
         logger.info(
@@ -260,6 +273,7 @@ def main():
         trust_remote_code=args.trust_remote_code,
         max_model_len=args.max_model_len,
         tensor_parallel_size=args.tensor_parallel_size,
+        data_parallel_size=args.data_parallel_size,
         # model_kwargs=simple_parse_args_string(args.model_kwargs),
         )
 
