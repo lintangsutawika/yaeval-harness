@@ -22,6 +22,7 @@ class EvaluateSystem:
                  run_args=None,
                  use_run_name=True,
                  batch_size=1,
+                 verbose=False,
                  **kwargs
                  ):
         self.dataset = dataset
@@ -35,6 +36,7 @@ class EvaluateSystem:
         self.output_path = output_path
         self.use_run_name = use_run_name
         self.run_args = run_args
+        self.verbose = verbose
 
     def run(self, temperature=0.1, top_p=1.0, repeat=1, seed=None):
         result_dict = {
@@ -58,51 +60,56 @@ class EvaluateSystem:
         }
         output_json = []
         idx = 0
-        for sample in tqdm(self.data_loader):
-            user_input, ground_truth = sample
 
-            ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
+        user_input = []
+        ground_truth = []
+        for inp, out in self.dataset:
+            user_input.append(inp)
+            ground_truth.append(out)
 
-            for ans, gt, inp, output_dict in zip(ans_list, ground_truth, user_input, output_dict_list):
-                score_dict = self.dataset.eval(ans, gt)
-                score_string = ", ".join([f"{metric}: {score}" for metric,score in score_dict.items()])
+        ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
 
-                # if self.verbose:
+        for ans, gt, inp, output_dict in zip(ans_list, ground_truth, user_input, output_dict_list):
+            ans = self.dataset.extract_answer(ans)
+            score_dict = self.dataset.eval(ans, gt)
+            score_string = ", ".join([f"{metric}: {score}" for metric,score in score_dict.items()])
+
+            if self.verbose:
                 logger.info(f"\nId: {idx}, {score_string}, Prediction: {ans}, Ground Truth: {gt}")
-                result_dict["n_samples"] += 1
-                for metric, score in score_dict.items():
-                    if metric not in result_dict:
-                        result_dict[metric] = score
-                    else:
-                        result_dict[metric] += score
+            result_dict["n_samples"] += 1
+            for metric, score in score_dict.items():
+                if metric not in result_dict:
+                    result_dict[metric] = score
+                else:
+                    result_dict[metric] += score
 
-                result_dict["duration"] += output_dict["duration"]
-                result_dict["input_tokens"] += output_dict["input_len"]
-                result_dict["output_tokens"] += output_dict["output_len"]
-                result_dict["total_tokens"] += (output_dict["input_len"] + output_dict["output_len"])
-                output_json.append(
-                    {
-                        "idx": idx,
-                        **score_dict,
-                        "ground_truth": gt,
-                        "answer": ans,
-                        "user_input": inp,
-                        **output_dict,
-                    }
-                )
+            result_dict["duration"] += output_dict["duration"]
+            result_dict["input_tokens"] += output_dict["input_len"]
+            result_dict["output_tokens"] += output_dict["output_len"]
+            result_dict["total_tokens"] += (output_dict["input_len"] + output_dict["output_len"])
+            output_json.append(
+                {
+                    "idx": idx,
+                    **score_dict,
+                    "ground_truth": gt,
+                    "answer": ans,
+                    "user_input": inp,
+                    **output_dict,
+                }
+            )
 
-                # data_dict["idx"].append(int(idx))
-                # data_dict["answer"].append(ans)
-                # data_dict["system_output"].append(output_dict["system_output"])
-                # data_dict["ground_truth"].append(gt)
-                # data_dict["user_input"].append(user_input)
-                # data_dict["score"].append(score)
-                # data_dict["duration"].append(output_dict["duration"])
-                # data_dict["input_tokens"].append(output_dict["input_len"])
-                # data_dict["output_tokens"].append(output_dict["output_len"])
-                # data_dict["total_tokens"].append(output_dict["input_len"] + output_dict["output_len"])
-                idx += 1
-            # zeno_upload(self.run_name, data_dict)
+            # data_dict["idx"].append(int(idx))
+            # data_dict["answer"].append(ans)
+            # data_dict["system_output"].append(output_dict["system_output"])
+            # data_dict["ground_truth"].append(gt)
+            # data_dict["user_input"].append(user_input)
+            # data_dict["score"].append(score)
+            # data_dict["duration"].append(output_dict["duration"])
+            # data_dict["input_tokens"].append(output_dict["input_len"])
+            # data_dict["output_tokens"].append(output_dict["output_len"])
+            # data_dict["total_tokens"].append(output_dict["input_len"] + output_dict["output_len"])
+            idx += 1
+        # zeno_upload(self.run_name, data_dict)
 
         result_dict = {**self.run_args, **result_dict}
         for metric, score in score_dict.items():
