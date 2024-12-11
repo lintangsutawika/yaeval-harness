@@ -18,23 +18,23 @@
 
 # Model Arguments
 model:
-  _component_: torchtune.models.qwen2_5.lora_qwen2_5_7b_instruct
+  _component_: torchtune.models.llama3_1.lora_llama3_1_8b
   lora_attn_modules: ['q_proj', 'v_proj', 'output_proj']
   apply_lora_to_mlp: True
   apply_lora_to_output: False
   lora_rank: 8  # higher increases accuracy and memory
   lora_alpha: 16  # usually alpha=2*rank
   lora_dropout: 0.0
+
 # Tokenizer
 tokenizer:
-  _component_: torchtune.models.qwen2_5.qwen2_5_tokenizer
-  path: /data/user_data/lsutawik/codethink/MODELS/Qwen2.5-7B-Instruct/vocab.json
-  merges_file: /data/user_data/lsutawik/codethink/MODELS/Qwen2.5-7B-Instruct/merges.txt
+  _component_: torchtune.models.llama3.llama3_tokenizer
+  path: /data/user_data/lsutawik/codethink/MODELS/Llama-3.1-8B-Instruct/original/tokenizer.model
   max_seq_len: 4096
 
 checkpointer:
   _component_: torchtune.training.FullModelHFCheckpointer
-  checkpoint_dir: /data/user_data/lsutawik/codethink/MODELS/Qwen2.5-7B-Instruct
+  checkpoint_dir: /data/user_data/lsutawik/codethink/MODELS/Llama-3.1-8B-Instruct
   checkpoint_files: [
     model-00001-of-00004.safetensors,
     model-00002-of-00004.safetensors,
@@ -43,8 +43,8 @@ checkpointer:
   ]
   adapter_checkpoint: null
   recipe_checkpoint: null
-  output_dir: /data/user_data/lsutawik/codethink/OUTPUTS/DPO-Qwen2.5-7B-Instruct/
-  model_type: QWEN2
+  output_dir: /data/user_data/lsutawik/codethink/OUTPUTS/DPO-Llama-3.1-8B-Instruct/
+  model_type: LLAMA3
   safe_serialization: True
 resume_from_checkpoint: False
 save_adapter_weights_only: False
@@ -52,7 +52,7 @@ save_adapter_weights_only: False
 # Dataset and Sampler
 dataset:
   # _component_: codethink.dataset.code_or_natlang_paired_dataset
-  _component_: codethink.dataset.mathinstruct_preference
+  _component_: preference_tuning.dataset.mathinstruct_preference
   train_on_input: True
 seed: null
 shuffle: True
@@ -77,7 +77,7 @@ gradient_accumulation_steps: 2
 
 
 # Logging
-output_dir: /data/user_data/lsutawik/codethink/LOGS/dpo-qwen2.5-7b-instruct
+output_dir: /data/user_data/lsutawik/codethink/LOGS/dpo-llama3.1-8b-instruct
 metric_logger:
   _component_: torchtune.training.metric_logging.DiskLogger
   log_dir: ${output_dir}
