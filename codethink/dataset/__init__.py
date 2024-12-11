@@ -14,7 +14,6 @@ from .arc_challenge import ARCDataset
 from .lastletterconcat import LastLetterConcatDataset
 from .mathqa import MathQADataset
 from .aime import AIMEDataset
-from .routing_preference import code_or_natlang_paired_dataset
 
 DATASET = {
     "svamp": SVAMPDataset,
@@ -26,13 +25,9 @@ DATASET = {
     "gsmhard": GSMHardDataset,
     "finqa": FinQADataset,
     "mathqa": MathQADataset,
-    # "mathqa_numeric": MathQANumericAnswerDataset,
-    # "mathqa_letter": MathQALetterAnswerDataset,
     "coinflip": CoinFlipDataset,
     "lastletterconcat": LastLetterConcatDataset,
     "algebra": AlgebraDataset,
-    # "cnn_summarize": CNNDataset,
-    # "cnn_question": CNNQuestionDataset,
     "arc_challenge": ARCDataset,
     "aime": AIMEDataset,
 }
