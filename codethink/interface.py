@@ -1,19 +1,22 @@
+import os
 import re
 import sys
+import ray
 import time
 import logging
+import itertools
 import subprocess
 import transformers
 
 from typing import List
 from functools import partial
 
-# import pal
-
 from vllm import LLM, SamplingParams, RequestOutput
+from vllm.lora.request import LoRARequest
+
+# from .modeling import TrajectoryControlLLM
 
 logger = logging.getLogger(__name__)
-
 
 def extract_regex(answer: str, fallback: str, regex: List):
     match = fallback
@@ -72,8 +75,9 @@ class SolverInterface:
                  revision="main",
                  trust_remote_code=False,
                  use_system_role=False,
-                 max_model_len=8096,
+                 max_model_len=4096,
                  tensor_parallel_size=1,
+                 data_parallel_size=1,
                  **kwargs):
 
         self.model = model
@@ -91,18 +95,49 @@ class SolverInterface:
         self.verbose = verbose
         self.stop = "\n```"
 
-        self.lm = LLM(
-            model=self.model,
-            revision=revision,
-            max_model_len=max_model_len,
-            # trust_remote_code=trust_remote_code,
-            tensor_parallel_size=tensor_parallel_size
-            )
+        self.data_parallel_size = data_parallel_size
+        if data_parallel_size <= 1:
+            self.lm = LLM(
+            # self.lm = TrajectoryControlLLM(
+                model=self.model,
+                revision=revision,
+                max_model_len=max_model_len,
+                # trust_remote_code=trust_remote_code,
+                tensor_parallel_size=tensor_parallel_size
+                )
+        else:
+            self.model_args = {
+                "model": self.model,
+                "revision": revision,
+                "worker_use_ray": True,
+                "max_model_len": max_model_len,
+                # "trust_remote_code": trust_remote_code,
+                "tensor_parallel_size":tensor_parallel_size
+            }
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(
             self.model,
             trust_remote_code=trust_remote_code
             )
         self.history = []
+
+    # Adapted from 
+    # https://github.com/EleutherAI/lm-evaluation-harness/blob/main/lm_eval/models/vllm_causallms.py
+    @ray.remote
+    def run_inference_one_model(
+        model_args: dict,
+        sampling_params,
+        requests: List[List[int]],
+        # lora_request: LoRARequest,
+        rank: int,
+    ):
+        del os.environ['CUDA_VISIBLE_DEVICES']
+        llm = LLM(**model_args)
+        return llm.generate(
+            prompts=requests,
+            sampling_params=sampling_params,
+            use_tqdm=True if rank == 0 else False,
+            # lora_request=lora_request,
+        )
 
     def generate(self, message, sampling_params):
         output = self.lm.generate(message, sampling_params, use_tqdm=False)
@@ -140,14 +175,43 @@ class SolverInterface:
         # sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop=["```\n", "``` \n"], include_stop_str_in_output=True)
         start_time = time.time()
 
-        all_result = []
-        all_output_dict = []
-        for model_output in self.generate(message, sampling_params):
+        if self.data_parallel_size > 1:
+
+            from more_itertools import distribute
+            from typing import Iterable
+            import os
+
+            def undistribute(iterable):
+                return [
+                    x
+                    for x in itertools.chain.from_iterable(
+                        itertools.zip_longest(*[list(x) for x in iterable])
+                    )
+                    if x is not None
+                ]
+
+            # dispatch requests to all self.data_parallel_size workers, in interleaved fashion
+            # interleaved important to balance context lengths across workers
+            requests = [list(x) for x in distribute(self.data_parallel_size, message)]
+            inputs = (
+                (self.model_args, sampling_params, req, rank)
+                for rank, req in enumerate(requests)
+            )
+            object_refs = [self.run_inference_one_model.remote(*x) for x in inputs]
+            results = ray.get(object_refs)
+            # Invoke ray.shutdown() to prevent hang-ups if subsequent calls required.
+            ray.shutdown()
+            # flatten results
+            model_generations = undistribute(results)
+        else:
+            model_generations = self.generate(message, sampling_params)
+
+        all_answers = []
+        all_outputs = []
+        for model_output in model_generations:
             output, (input_len, output_len) = get_tokens(model_output)
 
-            all_output = []
-            all_results = {}
-            all_output_tokens = []
+            answer_dict = {}
             if isinstance(output, str):
                 output = [output]
 
@@ -155,8 +219,7 @@ class SolverInterface:
                 if self.verbose:
                     print(_output)
                 self.history.append(_output)
-                all_output.append(_output)
-                all_output_tokens.append(output_len)
+                # all_outputs.append(_output)
 
                 # Check if the _output is a program
                 code = self.process_generation_to_code(_output)
@@ -172,25 +235,24 @@ class SolverInterface:
                         print(e)
                         exec_result = ""
 
-                    if exec_result in all_results:
-                        all_results[exec_result] += 1
+                    if exec_result in answer_dict:
+                        answer_dict[exec_result] += 1
                     else:
-                        all_results[exec_result] = 1
-
+                        answer_dict[exec_result] = 1
                 else:
                     if self.get_answer_symbol is not None:
                         match = self.get_answer_symbol(_output)
-                        if match in all_results:
-                            all_results[match] += 1
+                        if match in answer_dict:
+                            answer_dict[match] += 1
                         else:
-                            all_results[match] = 1
+                            answer_dict[match] = 1
 
             if repeat == 1:
-                result = list(all_results.keys())[0]
+                result = list(answer_dict.keys())[0]
             else:
-                counts = list(all_results.values())
+                counts = list(answer_dict.values())
                 max_idx = counts.index(max(counts))
-                result = list(all_results.keys())[max_idx]
+                result = list(answer_dict.keys())[max_idx]
 
             duration = time.time() - start_time
             output_dict = {
@@ -199,9 +261,9 @@ class SolverInterface:
                 "duration": duration,
                 "system_output": output,
             }
-            all_result.append(result)
-            all_output_dict.append(output_dict)
-        return all_result, all_output_dict
+            all_answers.append(result)
+            all_outputs.append(output_dict)
+        return all_answers, all_outputs
 
 if __name__ == "__main__":
 
@@ -210,32 +272,37 @@ if __name__ == "__main__":
     from datasets import load_dataset
 
     gsm8k_test = load_dataset("openai/gsm8k", "main", split="test")
-    model_str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    model_str = "meta-llama/Llama-3.1-8B-Instruct"
     system_message = '''\
 Write a function to solve a given problem by the user. Only write the program. Do not use `print`.
 The function must be named solution() and return `value` where value is only a number without any signs like '$' or '%'.\
 '''
-    model = HFProgramInterface(
+    model = SolverInterface(
         system_message=system_message,
         model=model_str,
         get_answer_expr='solution()',
-        verbose=True,
+        data_parallel_size=2,
         )
 
     all_scores = []
-    for sample in tqdm(gsm8k_test):
 
+    requests = []
+    task_samples = []
+    for sample in tqdm(gsm8k_test):
+        requests.append(sample["question"])
+        task_samples.append(sample)
+
+    output, _ = model.run(requests, temperature=0.1)
+
+    for ans, sample in tqdm(zip(output, task_samples)):
         question = sample["question"]
-        answer = sample["answer"]
-        answer = answer.split("#### ")[-1]
-        answer = float(re.findall(r'\d+', answer)[0])
-        user_prompt = f"{question}"
+        gt = sample["answer"]
+        gt = gt.split("#### ")[-1]
+        gt = float(re.findall(r'\d+', gt)[0])
         try:
-            ans, flops = model.run(user_prompt, temperature=0.1)
             ans = float(ans)
-            score = 1 if abs(ans - answer) < 1e-3 else 0
+            score = 1 if abs(ans - gt) < 1e-3 else 0
         except Exception as e:
-            print("Exception:", e)
             ans = ''
             score = 0
         all_scores.append(score)
