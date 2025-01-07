@@ -66,12 +66,12 @@ At the end, you MUST return an single value.\
 Solve the problem by thinking step-by-step. Go through the reasoning in order to derive the final answer.
 At the end, you MUST write the answer as an integer after '####'."\
 """,
-    "routing-cot-first" : """\
+    "routing-nl-first" : """\
 Choose only one way to solve the problem: by thinking step-by-step OR writing a program as a way to solve a given task. Do NOT use both:
 1. Thinkng step-by-step: Think step-by-step. Derive and go through the logical steps in order to arrive at the final answer. At the end, you MUST write the answer after '####'.
 2. Writing a program: DIRECTLY and ONLY write a program with the PYTHON programming language. The function must be named solution() without any input arguments. At the end, you MUST return an single value.\
 """,
-    "routing-code-first" : """\
+    "routing-pl-first" : """\
 Choose only one way to solve the problem: by writing a program OR thinking step-by-step as a way to solve a given task. Do NOT use both:
 1. Writing a program: DIRECTLY and ONLY write a program with the PYTHON programming language. The function must be named solution() without any input arguments. At the end, you MUST return an single value.
 2. Thinkng step-by-step: Think step-by-step. Derive and go through the logical steps in order to arrive at the final answer. At the end, you MUST write the answer after '####'.\
