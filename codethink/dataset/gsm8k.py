@@ -40,7 +40,8 @@ def gsm8k_fewshot_output(x):
     return "Olivia had 23 dollars. 5 bagels for 3 dollars each will be 5 x 3 = 15 dollars. So she has 23 - 15 dollars left. 23 - 15 is 8. #### 8."
 
 def gsm8k_input(x):
-    return "Question: " + x["question"] + "\nAnswer:"
+    # return "Question: " + x["question"] + "\nAnswer:"
+    return x["question"]
 
 def gsm8k_output(x):
     answer = x["answer"]
