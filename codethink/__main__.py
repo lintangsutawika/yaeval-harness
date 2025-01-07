@@ -1,7 +1,5 @@
 import os
-import re
 import sys
-import json
 import logging
 
 logging.basicConfig(
@@ -13,8 +11,6 @@ logging.basicConfig(
 import argparse
 import importlib.util
 
-from tqdm import tqdm
-from datasets import load_dataset
 
 from codethink.utils import simple_parse_args_string
 from codethink import INTERFACE, SYSTEM_MESSAGE
@@ -29,7 +25,10 @@ def setup_parser() -> argparse.ArgumentParser:
         "--model_str", "-m", type=str, help="Name of model e.g. `hf`"
     )
     parser.add_argument(
-        "--inference_mode", "-i", type=str, default="default", help="Solve task by generating code or other test time inference approaches"
+        "--inference_mode", "-i",
+        type=str,
+        default="default",
+        help="Solve task by generating code or other test time inference approaches"
     )
     parser.add_argument(
         "--run_name",
