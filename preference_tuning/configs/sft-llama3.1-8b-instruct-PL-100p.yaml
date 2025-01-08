@@ -16,6 +16,8 @@
 # This config works best when the model is being fine-tuned on 2+ GPUs.
 # For single device LoRA DPO alignment please use 7B_lora_dpo_single_device.yaml
 
+output_dir: /data/user_data/lsutawik/codethink/OUTPUTS/SFT-Llama-3.1-8B-Instruct-PL-100p/
+
 # Model Arguments
 model:
   _component_: torchtune.models.llama3_1.lora_llama3_1_8b
@@ -51,17 +53,18 @@ save_adapter_weights_only: False
 
 # Dataset and Sampler
 dataset:
-  _component_: preference_tuning.dataset.sft_dataset
-  data_file: "mathinstruct_PL_100p.csv"
+  _component_: torchtune.datasets.instruct_dataset
+  source: "csv"
   column_map:
     "input": "question"
     "output": "response_i"
+  data_files: "/home/lsutawik/01-code-reasoning/chain-of-code-thinking/preference_tuning/dataset/mathinstruct_PL_100p.csv"
   train_on_input: True
 seed: null
 shuffle: True
 
 # Optimizer and Scheduler
-batch_size: 16
+batch_size: 32
 epochs: 10
 optimizer:
   _component_: torch.optim.AdamW
@@ -75,15 +78,14 @@ loss:
   _component_: torchtune.modules.loss.CEWithChunkedOutputLoss
 
 max_steps_per_epoch: 100
-gradient_accumulation_steps: 1
+gradient_accumulation_steps: 2
 
 
 # Logging
-output_dir: /data/user_data/lsutawik/codethink/LOGS/dpo-llama3.1-8b-instruct
 metric_logger:
-  # _component_: torchtune.training.metric_logging.DiskLogger
   _component_: torchtune.training.metric_logging.WandBLogger
   project: codethink
+  name: sft-llama3.1-8b-instruct-PL-100p
 log_every_n_steps: 1
 log_peak_memory_stats: False
 

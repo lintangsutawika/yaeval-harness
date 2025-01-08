@@ -51,8 +51,14 @@ save_adapter_weights_only: False
 
 # Dataset and Sampler
 dataset:
+  # _component_: torchtune.datasets.preference_dataset
   _component_: preference_tuning.dataset.dpo_dataset
-  data_file: "mathinstruct_PL_50p.csv"
+  source: "csv"
+  column_map:
+    "prompt": "question"
+    "chosen": "response_i"
+    "rejected": "response_j"
+  data_files: "/home/lsutawik/01-code-reasoning/chain-of-code-thinking/preference_tuning/dataset/mathinstruct_PL_50p.csv"
   train_on_input: True
 seed: null
 shuffle: True
@@ -77,11 +83,10 @@ gradient_accumulation_steps: 2
 
 
 # Logging
-output_dir: /data/user_data/lsutawik/codethink/LOGS/dpo-llama3.1-8b-instruct
 metric_logger:
-  # _component_: torchtune.training.metric_logging.DiskLogger
   _component_: torchtune.training.metric_logging.WandBLogger
   project: codethink
+  name: dpo-llama3.1-8b-instruct-PL-50p
 log_every_n_steps: 1
 log_peak_memory_stats: False
 
