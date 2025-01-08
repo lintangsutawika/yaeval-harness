@@ -1,5 +1,5 @@
-# from .routing_preference import code_or_natlang_paired_dataset
-from .mathinstruct_preference import mathinstruct_preference, MathInstructPoTDataset, MathInstructCoTDataset
+from ._dataset import dpo_dataset
+from .mathinstruct_preference import MathInstructPoTDataset, MathInstructCoTDataset
 
 DATASET = {
     "mathinstrucy_pot": MathInstructPoTDataset,
