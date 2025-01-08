@@ -14,7 +14,7 @@ from .arc_challenge import ARCDataset
 from .lastletterconcat import LastLetterConcatDataset
 from .mathqa import MathQADataset
 from .aime import AIMEDataset
-from .math import mathdatasets
+from .hendrycks_math import mathdatasets
 
 DATASET = {
     "svamp": SVAMPDataset,
