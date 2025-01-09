@@ -16,6 +16,8 @@
 # This config works best when the model is being fine-tuned on 2+ GPUs.
 # For single device LoRA DPO alignment please use 7B_lora_dpo_single_device.yaml
 
+output_dir: /data/user_data/lsutawik/codethink/OUTPUTS/DPO-Llama-3.1-8B-Instruct-PL100p/
+
 # Model Arguments
 model:
   _component_: torchtune.models.llama3_1.lora_llama3_1_8b
@@ -64,7 +66,7 @@ seed: null
 shuffle: True
 
 # Optimizer and Scheduler
-batch_size: 8
+batch_size: 4
 epochs: 15
 optimizer:
   _component_: torch.optim.AdamW
