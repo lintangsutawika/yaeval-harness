@@ -17,7 +17,7 @@ def aqua_output(x):
         l, *a = _x.split(")")
         a = ")".join(a)
         answer_dict[l] = a
-    return x["correct"], answer_dict[x["correct"]]
+    return f"{x["correct"]} OR {answer_dict[x["correct"]]}"
 
 def aqua_fewshot_output(x):
     return f"Let's think step by step. {x['rationale']} #### {x['correct']}"
