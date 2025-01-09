@@ -293,27 +293,38 @@ def main():
     else:
         task_kwargs = {}
 
-    eval_dataset = ALL_TASK_LIST[args.task](
-        num_fewshot=args.num_fewshot,
-        sampler=None,
-        n_samples=args.n_samples,
-        data_kwargs=data_kwargs,
-        **task_kwargs,
-    )
+    task_list = args.task.split(",")
+    for task in task_list:
+        logger.info(f"Task: {task}")
+        if len(task_list) > 1:
+            task_run_name = run_name + f"_{task}"
+        else:
+            task_run_name = run_name
+        eval_dataset = ALL_TASK_LIST[task](
+            num_fewshot=args.num_fewshot,
+            sampler=None,
+            n_samples=args.n_samples,
+            data_kwargs=data_kwargs,
+            **task_kwargs,
+        )
 
-    evaluator = EvaluateSystem(
-        model_system=model_system,
-        dataset=eval_dataset,
-        run_name=run_name,
-        output_path=args.output_path,
-        run_args=vars(args),
-        batch_size=args.batch_size,
-        verbose=args.verbose,
-        use_run_name=False if args.use_output_path_only == True else True,
-    )
+        evaluator = EvaluateSystem(
+            model_system=model_system,
+            dataset=eval_dataset,
+            run_name=task_run_name,
+            output_path=args.output_path,
+            run_args=vars(args),
+            batch_size=args.batch_size,
+            verbose=args.verbose,
+            use_run_name=False if args.use_output_path_only == True else True,
+        )
 
-    evaluator.run(temperature=args.temperature, top_p=args.top_p, repeat=args.repeat, seed=args.seed)
-
+        evaluator.run(
+            temperature=args.temperature,
+            top_p=args.top_p,
+            repeat=args.repeat,
+            seed=args.seed
+        )
 
 if __name__ == "__main__":
 
