@@ -230,7 +230,8 @@ def main():
     parser = setup_parser()
     args = parse_eval_args(parser)
 
-    run_name = args.run_name.replace("/", "-")
+    run_name = args.run_name
+
     logger.info(f"Run: {run_name}")
     logger.info(
         "\n{} Run Configuration {}\n{}\n{}".format(
@@ -296,10 +297,14 @@ def main():
     task_list = args.task.split(",")
     for task in task_list:
         logger.info(f"Task: {task}")
-        if len(task_list) > 1:
-            task_run_name = run_name + f"_{task}"
+        if run_name is None:
+            task_run_name = f"{args.model_str}-{task}-{model_system}"
         else:
-            task_run_name = run_name
+            if len(task_list) > 1:
+                task_run_name = f"{run_name}-{task}-{model_system}"
+            else:
+                task_run_name = run_name
+        task_run_name = task_run_name.replace("/", "-")
         eval_dataset = ALL_TASK_LIST[task](
             num_fewshot=args.num_fewshot,
             sampler=None,
