@@ -15,6 +15,8 @@ try:
 except:
     from data import TransformedDataset
 
+from codethink.utils import is_runnable_code, process_generation_to_code
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 def preprocessing(dataset, solution_type="PoT"):
@@ -41,7 +43,9 @@ def pot_output(x):
     return "\n".join(update_solution)
 
 def pot_eval(prediction, ground_truth):
-    answer = eval(ground_truth)
+    answer = is_runnable_code(ground_truth, time_out=1)
+    if answer is False:
+        answer = ground_truth
     if prediction == answer:
         return 1
     else:
@@ -134,7 +138,7 @@ MathInstructPoTDataset = partial(
     preprocessing=partial(preprocessing, solution_type="PoT"),
     input_text=pot_input,
     output_text=pot_output,
-    evaluation=lambda x, y: -1,
+    evaluation=pot_eval,
     test_split="train",
 )
 
