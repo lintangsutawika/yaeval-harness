@@ -69,7 +69,7 @@ class EvaluateSystem:
 
         ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
 
-        for ans, gt, inp, output_dict in zip(ans_list, ground_truth, user_input, output_dict_list):
+        for ans, gt, inp, output_dict in tqdm(zip(ans_list, ground_truth, user_input, output_dict_list), total=len(ans_list)):
             ans = self.dataset.extract_answer(ans)
             score_dict = self.dataset.eval(ans, gt)
             score_string = ", ".join([f"{metric}: {score}" for metric,score in score_dict.items()])

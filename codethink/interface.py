@@ -78,22 +78,35 @@ class SolverInterface:
                  max_model_len=4096,
                  tensor_parallel_size=1,
                  data_parallel_size=1,
+                 model_kwargs={},
                  **kwargs):
 
         self.model = model
         self.system_message = system_message
         self.use_system_role = use_system_role
         self.repeat = repeat
-        if isinstance(get_answer_symbol, str):
+        if get_answer_symbol == "PASS":
+            self.get_answer_symbol = partial(pass_fn, fallback=fallback)
+        elif isinstance(get_answer_symbol, str):
             self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(get_answer_symbol)])
         elif isinstance(get_answer_symbol, List):
             self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(pattern) for pattern in get_answer_symbol])
         else:
-            self.get_answer_symbol = partial(pass_fn, fallback=fallback)
+            self.get_answer_symbol = partial(
+                extract_regex,
+                fallback=fallback,
+                regex=[
+                    re.compile("answer is (\\-?[0-9\\.\\,]*[0-9]+)"),
+                    re.compile("answer is (.*)."),
+                    ]
+                )
         self.answer_expr = answer_expr
         self.fallback = fallback
         self.verbose = verbose
-        self.stop = "\n```"
+
+        self.model_kwargs = model_kwargs
+        if "stop" in self.model_kwargs:
+            self.model_kwargs["stop"] = self.model_kwargs["stop"].replace("\\n", "\n")
 
         self.data_parallel_size = data_parallel_size
         if data_parallel_size <= 1:
@@ -140,7 +153,7 @@ class SolverInterface:
         )
 
     def generate(self, message, sampling_params):
-        output = self.lm.generate(message, sampling_params, use_tqdm=False)
+        output = self.lm.generate(message, sampling_params, use_tqdm=True if self.verbose else False)
         return output
 
     def process_generation_to_code(self, gens: str):
@@ -170,7 +183,7 @@ class SolverInterface:
             )
         except:
             message = self.system_message+"\n\n"+prompt
-        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed)
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, **self.model_kwargs)
         # sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop=self.stop, include_stop_str_in_output=True)
         # sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, n=repeat, seed=seed, stop=["```\n", "``` \n"], include_stop_str_in_output=True)
         start_time = time.time()
