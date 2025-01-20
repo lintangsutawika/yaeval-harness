@@ -17,20 +17,14 @@ def aqua_output(x):
         l, *a = _x.split(")")
         a = ")".join(a)
         answer_dict[l] = a
-    return f"{x["correct"]} OR {answer_dict[x["correct"]]}"
-
-def aqua_fewshot_output(x):
-    return f"Let's think step by step. {x['rationale']} #### {x['correct']}"
+    return f"{x['correct']} OR {answer_dict[x['correct']]}"
 
 def aqua_eval(prediction, ground_truth):
-
     score = 0
     letter, number = ground_truth.split(" OR ")
     if prediction == letter:
         score = 1
     elif prediction == number:
-        score = 1
-    elif prediction == full_answer:
         score = 1
     else:
         try:
@@ -53,7 +47,6 @@ AQUADataset = partial(
     input_text=aqua_input,
     output_text=aqua_output,
     evaluation=aqua_eval,
-    fewshot_output_text=aqua_fewshot_output,
     test_split="test",
     fewshot_split="train",
 )

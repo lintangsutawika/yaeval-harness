@@ -70,6 +70,18 @@ GSMHardDataset = partial(
     # fewshot_split="train",
 )
 
+GSMHardGenerateTestsDataset = partial(
+    TransformedDataset,
+    data_path="reasoning-machines/gsm-hard",
+    input_text=lambda x: "Given a task, write tests that could verify if the assumptions made are correct"+x["input"],
+    output_text=gsm8k_output,
+    # fewshot_input_text=gsm8k_fewshot_input,
+    # fewshot_output_text=gsm8k_fewshot_output,
+    evaluation=gsm8k_eval,
+    test_split="train",
+    # fewshot_split="train",
+)
+
 if __name__ == "__main__":
 
     dataset = GSMHardDataset(

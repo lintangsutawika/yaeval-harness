@@ -38,6 +38,7 @@ def mathqa_output(x):
     numeric_answer.replace(" . ", "")
     numeric_answer.replace(" : ", "/")
     numeric_answer.replace(" ", "")
+    numeric_answer = numeric_answer.replace(",", "")
 
     pattern = r"\b(?:\d{1,3}(?:,\d{3})*|\d+)(?:\.\d+)?(?:[/:]\d+)?\b"
     try:
@@ -52,6 +53,7 @@ def mathqa_fewshot_output(x):
 
 def mathqa_eval(prediction, ground_truth):
 
+    prediction = prediction.replace("$", "")
     score = 0
     letter, number, full_answer = ground_truth.split(" OR ")
     if prediction == letter:
