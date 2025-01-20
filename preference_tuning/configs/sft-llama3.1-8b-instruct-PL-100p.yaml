@@ -64,7 +64,7 @@ seed: null
 shuffle: True
 
 # Optimizer and Scheduler
-batch_size: 32
+batch_size: 16
 epochs: 10
 optimizer:
   _component_: torch.optim.AdamW

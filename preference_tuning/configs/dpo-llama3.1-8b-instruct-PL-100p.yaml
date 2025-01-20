@@ -36,7 +36,7 @@ tokenizer:
 
 checkpointer:
   _component_: torchtune.training.FullModelHFCheckpointer
-  checkpoint_dir: /data/user_data/lsutawik/codethink/OUTPUTS/SFT-Llama-3.1-8B-Instruct-PL100p/base_model/
+  checkpoint_dir: /data/user_data/lsutawik/codethink/MODELS/Llama-3.1-8B-Instruct
   checkpoint_files: [
     ft-model-00001-of-00004.safetensors,
     ft-model-00002-of-00004.safetensors,

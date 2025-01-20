@@ -32,7 +32,7 @@ model:
 tokenizer:
   _component_: torchtune.models.llama3.llama3_tokenizer
   path: /data/user_data/lsutawik/codethink/MODELS/Llama-3.1-8B-Instruct/original/tokenizer.model
-  max_seq_len: 1024
+  max_seq_len: 4096
 
 checkpointer:
   _component_: torchtune.training.FullModelHFCheckpointer
@@ -64,21 +64,21 @@ seed: null
 shuffle: True
 
 # Optimizer and Scheduler
-batch_size: 32
+batch_size: 8
 epochs: 10
 optimizer:
   _component_: torch.optim.AdamW
   fused: True
   weight_decay: 0.05
-  lr: 5e-5
+  lr: 5e-6
 lr_scheduler:
   _component_: torchtune.training.lr_schedulers.get_cosine_schedule_with_warmup
-  num_warmup_steps: 50
+  num_warmup_steps: 500
 loss:
   _component_: torchtune.modules.loss.CEWithChunkedOutputLoss
 
-max_steps_per_epoch: 100
-gradient_accumulation_steps: 2
+max_steps_per_epoch: 500
+gradient_accumulation_steps: 4
 
 
 # Logging

@@ -36,12 +36,12 @@ tokenizer:
 
 checkpointer:
   _component_: torchtune.training.FullModelHFCheckpointer
-  checkpoint_dir: /data/user_data/lsutawik/codethink/OUTPUTS/SFT-Llama-3.1-8B-Instruct-PL75p/base_model/
+  checkpoint_dir: /data/user_data/lsutawik/codethink/MODELS/Llama-3.1-8B-Instruct
   checkpoint_files: [
-    ft-model-00001-of-00004.safetensors,
-    ft-model-00002-of-00004.safetensors,
-    ft-model-00003-of-00004.safetensors,
-    ft-model-00004-of-00004.safetensors
+    model-00001-of-00004.safetensors,
+    model-00002-of-00004.safetensors,
+    model-00003-of-00004.safetensors,
+    model-00004-of-00004.safetensors
   ]
   adapter_checkpoint: null
   recipe_checkpoint: null
@@ -72,10 +72,10 @@ optimizer:
   _component_: torch.optim.AdamW
   fused: True
   weight_decay: 0.05
-  lr: 5e-6
+  lr: 5e-7
 lr_scheduler:
   _component_: torchtune.training.lr_schedulers.get_cosine_schedule_with_warmup
-  num_warmup_steps: 500
+  num_warmup_steps: 750
 loss:
   _component_: torchtune.rlhf.loss.DPOLoss
   beta: 0.5
