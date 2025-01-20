@@ -133,9 +133,14 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--task",
-        default="gsm8k",
+        default=None,
         type=str,
         help="Task to evaluate model on",
+    )
+    parser.add_argument(
+        "--rescore",
+        action="store_true",
+        help="Rescore the output",
     )
     parser.add_argument(
         "--system_message",
@@ -274,7 +279,7 @@ def main():
         max_model_len=args.max_model_len,
         tensor_parallel_size=args.tensor_parallel_size,
         data_parallel_size=args.data_parallel_size,
-        # model_kwargs=simple_parse_args_string(args.model_kwargs),
+        model_kwargs=simple_parse_args_string(args.model_kwargs),
         )
 
     
@@ -298,10 +303,10 @@ def main():
     for task in task_list:
         logger.info(f"Task: {task}")
         if run_name is None:
-            task_run_name = f"{args.model_str}-{task}-{model_system}"
+            task_run_name = f"{args.model_str}-{task}-{args.system_message}"
         else:
             if len(task_list) > 1:
-                task_run_name = f"{run_name}-{task}-{model_system}"
+                task_run_name = f"{run_name}-{task}-{args.system_message}"
             else:
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
