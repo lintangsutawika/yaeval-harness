@@ -74,6 +74,16 @@ GSM8KDataset = partial(
     # fewshot_split="train",
 )
 
+GSM8KRoutingDataset = partial(
+    TransformedDataset,
+    data_path="gsm8k",
+    data_name="main",
+    input_text=lambda x: x['question']+"\n\nWhich method is the best way to solve this problem?", # Answer then write the solution.",
+    output_text=lambda x: "programming language",
+    evaluation=lambda x, y: 1 if re.sub(r'[^\w\s]', '', x.lower()) == re.sub(r'[^\w\s]', '', y.lower()) else 0,
+    test_split="test",
+)
+
 if __name__ == "__main__":
 
     dataset = GSM8KDataset(
