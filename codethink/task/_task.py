@@ -1,5 +1,6 @@
 import os
 
+from transformers import AutoTokenizer
 # Task
 # Do initial inference of task
 # Do parallel process?
@@ -21,16 +22,41 @@ class Task:
                  preprocessor: callable = None,
                  postprocessor: callable = None,
                  inference_fn: callable = None,
+                 tokenizer: str = None,
+                 system_message: str = None,
+                 evaluation: callable = None,
                  ):
         self.name = name
         self.subtask_list = subtask_list
-        self.dataset = dataset(**dataset_kwargs)
+        if dataset is not None:
+            self.dataset = dataset(**dataset_kwargs)
+        else:
+            self.dataset = None
         self.preprocessor = preprocessor
         self.postprocessor = postprocessor
         if inference_fn is None:
             self.inference_fn = lambda x: x
         else:
             self.inference_fn = inference_fn
+
+        if tokenizer is not None:
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
+            [task.set_tokenizer(tokenizer) for task in self.subtask_list]
+        else:
+            self.tokenizer = None
+
+        if system_message is not None:
+            self.system_message = system_message
+        else:
+            self.system_message = None
+
+        if evaluation is not None:
+            self.eval = evaluation
+        else:
+            self.eval = lambda x, y: -1
+
+    def set_tokenizer(self, tokenizer):
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
 
     def run(self, idx, task_id=None):
         state = {
@@ -40,18 +66,18 @@ class Task:
             "step": []
             }
 
-        if subtask_list is None:
+        if self.subtask_list is None:
             output, _state = self.run_task(idx, state)
             state["step"].append({"step_id": 0, "task": self.name, **_state})
             return output, state
 
-        for _id, task in enumerate(subtask_list):
-            state["current_step"] += 1
-            output, state = task.run_task(idx,
+        for _id, task in enumerate(self.subtask_list):
+            output, _state = task.run_task(idx,
                                           state=state,
                                           inference_fn=self.inference_fn
                                           )
             state["step"].append({"step_id": _id, "task": task.name, **_state})
+            state["current_step"] += 1
         return output, state
 
     def preprocess(self, x, state=None):
@@ -67,18 +93,25 @@ class Task:
             return x
 
     def build_message(self, x):
-        message = [
-            {"role": "system", "content": self.system_message},
-            {"role": "user", "content": x},
-            ]
+        message = [{"role": "user", "content": x}]
+        if self.system_message is not None:
+            message.insert(
+                0, 
+                {"role": "system", "content": self.system_message}
+                )
+        elif self.tokenizer is not None:
+            message = self.tokenizer.apply_chat_template(
+                message,
+                tokenize=False,
+                add_generation_prompt=True,
+                )
         return message
 
     def run_task(self, idx, state=None, inference_fn=None):
         # State is what?
         # evals, inputs, outputs 
         # Accumulate states
-        previous_output = state["current_output"]
-        
+        new_state = {}
         x, y = self.dataset.__getitem__(idx)
         new_state["raw_input"] = x
         new_state["groud_truth"] = y
@@ -89,16 +122,15 @@ class Task:
             o = self.inference_fn(x)
         else:
             o = inference_fn(x)
-        state["raw_output"] = o
+        new_state["raw_output"] = o
         o = self.postprocess(o, state)
-        state["output"] = o
+        new_state["output"] = o
         new_state["eval"] = self.eval(o, y)
 
-        return output, new_state
+        return o, new_state
 
 if __name__ == "__main__":
-    from codethink.datasets import GSM8KDataset
-
+    from codethink.dataset.gsm8k import GSM8KDataset, GSM8KRoutingDataset
     def preprocess_PL_or_NL(x, state):
         current_step = state["current_step"]
         solve_with = state["step"][current_step-1]["output"]
@@ -108,10 +140,9 @@ if __name__ == "__main__":
             return x["question"]
         return x
 
-
     task_1 = Task(
         name="gsm8k_routing",
-        dataset=GSM8KDataset,
+        dataset=GSM8KRoutingDataset,
         dataset_kwargs={"num_fewshot": 0},
         )
 
@@ -128,6 +159,11 @@ if __name__ == "__main__":
             task_1,
             task_2,
             ],
+        tokenizer="meta-llama/Llama-3.1-8B-Instruct"
         )
 
-    all_task.run(0)
+    o, s = all_task.run(0)
+    print("### OUTPUT ###")
+    print(o)
+    print("### STATE ###")
+    print(s)
