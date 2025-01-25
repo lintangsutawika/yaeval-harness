@@ -8,18 +8,12 @@ from datasets import load_dataset
 
 from .utils import extract_fn
 
-def match_fn(x, y):
-    try:
-        return 1 if x == y else 0
-    except Exception as e:
-        return 0
 
 class TransformedDataset(Dataset):
     def __init__(self,
                  name: str=None,
                  data_path: str,
                  data_name: str=None,
-                 evaluation: Union[str, Dict[str, Callable]]="match",
                  input_text: Union[str, Callable]=None,
                  output_text: Union[str, Callable]=None,
                  preprocessing: Callable=None,
@@ -69,15 +63,7 @@ class TransformedDataset(Dataset):
         self.sampler = sampler
         self.fewshot_delimiter = fewshot_delimiter
         self.answer_delimiter = answer_delimiter
-        if isinstance(evaluation, Callable):
-            self.evaluation = {"score": evaluation}
-        elif isinstance(evaluation, str):
-            if evaluation == "match":
-                self.evaluation = {"match": match_fn}
-            else:
-                raise NotImplementedError
-        else:
-            self.evaluation = evaluation
+
         if preprocessing is not None:
             self.dataset = preprocessing(self.dataset)
 
@@ -170,18 +156,6 @@ class TransformedDataset(Dataset):
                 ])
             )
         return fewshot_samples
-
-    def extract_answer(self, prediction):
-        if self.postprocessing is None:
-            return prediction
-        else:
-            return self.postprocessing(prediction)
-
-    def eval(self, prediction, ground_truth):
-        # return self.eval(prediction, ground_truth)
-        return {
-            eval_name: eval_fn(prediction, ground_truth) for eval_name, eval_fn in self.evaluation.items()
-            }
 
     def __len__(self):
         return len(self.dataset[self.test_split])
