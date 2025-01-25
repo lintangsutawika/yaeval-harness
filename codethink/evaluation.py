@@ -93,18 +93,25 @@ class EvaluateSystem:
 
         ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
 
-    # Use ThreadPoolExecutor for concurrent execution with a progress bar
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [
-            executor.submit(all_task.run, idx, inference_fn=partial(fetch_completion, kwargs=kwargs), task_id="gsm8k_pipeline")
-            for idx in range(0,10)
-        ]
+        # Use ThreadPoolExecutor for concurrent execution with a progress bar
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [
+                executor.submit(
+                    all_task.run,
+                    idx,
+                    inference_fn=partial(
+                        fetch_completion,
+                        kwargs=kwargs
+                    ),
+                    task_id="gsm8k_pipeline"
+                ) for idx in range(0,10)
+            ]
 
         # Use tqdm to display a progress bar
+        all_results = []
         for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
             try:
-                result = future.result()
-                # print(f"Request {i} succeeded with response: {result}")
+                all_results.append(future.result())
             except Exception as e:
                 print(f"Request {i} failed with error: {e}")
 
