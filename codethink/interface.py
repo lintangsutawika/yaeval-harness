@@ -7,6 +7,9 @@ import logging
 import itertools
 import subprocess
 import transformers
+import concurrent.futures
+from openai import OpenAI
+from tqdm import tqdm
 
 from typing import List
 from functools import partial
@@ -14,33 +17,7 @@ from functools import partial
 from vllm import LLM, SamplingParams, RequestOutput
 from vllm.lora.request import LoRARequest
 
-# from .modeling import TrajectoryControlLLM
-
 logger = logging.getLogger(__name__)
-
-def extract_regex(answer: str, fallback: str, regex: List):
-    match = fallback
-    for _regex in regex:
-        _match = _regex.findall(answer)
-        if _match:
-            match = _match[0]
-            break
-    return match
-
-def extract_fn(answer: str, fallback: str):
-    answer = answer.split('####')[-1].strip()
-    for char in [',', '$', '%', 'g']:
-        answer = answer.replace(char, '')
-    try:
-        return answer
-    except:
-        return fallback
-
-def pass_fn(answer: str, fallback: str):
-    try:
-        return answer.strip()
-    except:
-        return fallback
 
 def get_tokens(model_outputs: RequestOutput):
 
@@ -66,6 +43,8 @@ def get_tokens(model_outputs: RequestOutput):
 class SolverInterface:
     def __init__(self,
                  model,
+                 api_key="EMPTY",
+                 api_base="http://localhost:8000/v1",
                  system_message,
                  repeat=1,
                  get_answer_symbol=None,
@@ -81,25 +60,24 @@ class SolverInterface:
                  model_kwargs={},
                  **kwargs):
 
-        self.model = model
-        self.system_message = system_message
-        self.use_system_role = use_system_role
-        self.repeat = repeat
-        if get_answer_symbol == "PASS":
-            self.get_answer_symbol = partial(pass_fn, fallback=fallback)
-        elif isinstance(get_answer_symbol, str):
-            self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(get_answer_symbol)])
-        elif isinstance(get_answer_symbol, List):
-            self.get_answer_symbol = partial(extract_regex, fallback=fallback, regex=[re.compile(pattern) for pattern in get_answer_symbol])
-        else:
-            self.get_answer_symbol = partial(
-                extract_regex,
-                fallback=fallback,
-                regex=[
-                    re.compile("answer is (\\-?[0-9\\.\\,]*[0-9]+)"),
-                    re.compile("answer is (.*)."),
-                    ]
-                )
+
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=api_base,
+        )
+
+        self.kwargs["model"] = model
+
+    def fetch_completion(self, messages, kwargs):
+        try:
+            return self.client.chat.completions.create(
+                messages=messages,
+                **kwargs,
+            )
+        except Exception as e:
+            print(f"Error fetching chat completion: {e}")
+            return None
+
         self.answer_expr = answer_expr
         self.fallback = fallback
         self.verbose = verbose
@@ -155,18 +133,6 @@ class SolverInterface:
     def generate(self, message, sampling_params):
         output = self.lm.generate(message, sampling_params, use_tqdm=True if self.verbose else False)
         return output
-
-    def process_generation_to_code(self, gens: str):
-        if '```python' in gens:
-            gens = gens.split('```python')[1].split('```')[0]
-        elif '```' in gens:
-            gens = gens.split('```')[1].split('```')[0]
-        elif self.answer_expr in gens:
-            gens = "def "+self.answer_expr+f"{self.answer_expr}".join(gens.split(self.answer_expr)[1:])
-        else:
-            return False
-            
-        return gens.split('\n')
 
     def run(self, prompt, time_out: float = 10, temperature: float = 0, top_p: float = 1, max_tokens: int = 512, repeat: int = 1, seed: int = None):
         if isinstance(prompt, str):

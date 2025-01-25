@@ -1,5 +1,6 @@
 import os
 
+from typing import Union, Callable, Dict
 from codethink import SYSTEM_MESSAGE
 
 from transformers import AutoTokenizer
@@ -15,6 +16,12 @@ from transformers import AutoTokenizer
 
 # Build Instances, sample_id, task_id
 
+def match_fn(x, y):
+    try:
+        return 1 if x == y else 0
+    except Exception as e:
+        return 0
+
 class Task:
     def __init__(self,
                  name,
@@ -26,7 +33,7 @@ class Task:
                  inference_fn: callable = None,
                  tokenizer: str = None,
                  system_message: str = None,
-                 evaluation: callable = None,
+                 evaluation: Union[str, Dict[str, Callable]]="match",
                  ):
         self.name = name
         self.subtask_list = subtask_list
@@ -61,6 +68,16 @@ class Task:
             self.eval = evaluation
         else:
             self.eval = lambda x, y: -1
+
+        if isinstance(evaluation, Callable):
+            self.evaluation = {"score": evaluation}
+        elif isinstance(evaluation, str):
+            if evaluation == "match":
+                self.evaluation = {"match": match_fn}
+            else:
+                raise NotImplementedError
+        else:
+            self.evaluation = evaluation
 
     def set_tokenizer(self, tokenizer):
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
@@ -123,6 +140,17 @@ class Task:
                 )
         return message
 
+    def extract_answer(self, prediction):
+        if self.postprocessing is None:
+            return prediction
+        else:
+            return self.postprocessing(prediction)
+
+    def eval(self, prediction, ground_truth):
+        return {
+            eval_name: eval_fn(prediction, ground_truth) for eval_name, eval_fn in self.evaluation.items()
+            }
+
     def run_task(self, idx, state=None, inference_fn=None):
         # State is what?
         # evals, inputs, outputs 
@@ -181,7 +209,6 @@ if __name__ == "__main__":
             task_1,
             task_2,
             ],
-        # tokenizer="meta-llama/Llama-3.1-8B-Instruct"
         )
 
     client = OpenAI(
@@ -217,3 +244,12 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Request {i} failed with error: {e}")
 
+
+            # self.get_answer_symbol = partial(
+            #     extract_regex,
+            #     fallback=fallback,
+            #     regex=[
+            #         re.compile("answer is (\\-?[0-9\\.\\,]*[0-9]+)"),
+            #         re.compile("answer is (.*)."),
+            #         ]
+            #     )

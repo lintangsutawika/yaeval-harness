@@ -13,8 +13,8 @@ import importlib.util
 
 
 from codethink.utils import simple_parse_args_string
-from codethink import INTERFACE, SYSTEM_MESSAGE
-from codethink.dataset import DATASET as TASK_LIST
+# from codethink import INTERFACE, SYSTEM_MESSAGE
+# from codethink.dataset import DATASET as TASK_LIST
 from codethink.evaluation import EvaluateSystem
 
 logger = logging.getLogger(__name__)
@@ -260,29 +260,6 @@ def main():
 
         # args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
 
-    if args.system_message is not None:
-        if args.system_message in SYSTEM_MESSAGE:
-            system_message = SYSTEM_MESSAGE[args.system_message]
-        else:
-            system_message = args.system_message
-    else:
-        system_message = SYSTEM_MESSAGE[args.inference_mode]
-
-    model_system = INTERFACE[args.inference_mode](
-        model=args.model_str,
-        system_message=system_message,
-        get_answer_expr=args.get_answer_expr,
-        get_answer_symbol=args.get_answer_symbol,
-        verbose=args.verbose,
-        use_system_role=args.use_system_role,
-        trust_remote_code=args.trust_remote_code,
-        max_model_len=args.max_model_len,
-        tensor_parallel_size=args.tensor_parallel_size,
-        data_parallel_size=args.data_parallel_size,
-        model_kwargs=simple_parse_args_string(args.model_kwargs),
-        )
-
-    
     if args.include_path is not None:
         ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
         ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
@@ -319,8 +296,11 @@ def main():
         )
 
         evaluator = EvaluateSystem(
+            api_key=args.api_key,
+            api_base=args.api_base,
+            inference_kwargs=args.inference_kwargs,
             model_system=model_system,
-            dataset=eval_dataset,
+            eval_dataset,
             run_name=task_run_name,
             output_path=args.output_path,
             run_args=vars(args),

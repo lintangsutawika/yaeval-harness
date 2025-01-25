@@ -3,6 +3,10 @@ import json
 import logging
 import datetime
 import jsonlines
+import concurrent.futures
+
+from openai import OpenAI
+from tqdm import tqdm
 
 from tqdm import tqdm
 from typing import List, Tuple
@@ -15,19 +19,21 @@ logger = logging.getLogger(__name__)
 
 class EvaluateSystem:
     def __init__(self,
-                 dataset,
-                 model_system,
+                 model,
+                 task_list,
+                 api_key="EMPTY",
+                 api_base="http://localhost:8000/v1",
                  run_name=None,
                  output_path=None,
                  run_args=None,
                  use_run_name=True,
-                 batch_size=1,
                  verbose=False,
                  **kwargs
                  ):
-        self.dataset = dataset
-        self.data_loader = DataLoader(self.dataset, batch_size=batch_size)
-        self.model_system = model_system
+        
+        self.model = model
+        self.task_list = task_list
+
         if run_name is None:
             current_time = datetime.datetime.now()
             self.run_name = current_time.strftime("%Y-%m-%d-%H:%M:%S")
@@ -37,6 +43,24 @@ class EvaluateSystem:
         self.use_run_name = use_run_name
         self.run_args = run_args
         self.verbose = verbose
+
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=api_base,
+        )
+
+        self.kwargs["model"] = model
+
+    def fetch_completion(self, messages, kwargs):
+        try:
+            return self.client.chat.completions.create(
+                messages=messages,
+                **kwargs,
+            )
+        except Exception as e:
+            print(f"Error fetching chat completion: {e}")
+            return None
+
 
     def run(self, temperature=0.1, top_p=1.0, repeat=1, seed=None):
         result_dict = {
@@ -68,6 +92,22 @@ class EvaluateSystem:
             ground_truth.append(out)
 
         ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
+
+    # Use ThreadPoolExecutor for concurrent execution with a progress bar
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [
+            executor.submit(all_task.run, idx, inference_fn=partial(fetch_completion, kwargs=kwargs), task_id="gsm8k_pipeline")
+            for idx in range(0,10)
+        ]
+
+        # Use tqdm to display a progress bar
+        for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
+            try:
+                result = future.result()
+                # print(f"Request {i} succeeded with response: {result}")
+            except Exception as e:
+                print(f"Request {i} failed with error: {e}")
+
 
         for ans, gt, inp, output_dict in tqdm(zip(ans_list, ground_truth, user_input, output_dict_list), total=len(ans_list)):
             ans = self.dataset.extract_answer(ans)
