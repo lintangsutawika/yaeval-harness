@@ -12,10 +12,22 @@ from tqdm import tqdm
 from typing import List, Tuple
 from torch.utils.data import DataLoader
 
+from vllm import SamplingParams
 from codethink.utils import zeno_upload
 
 logger = logging.getLogger(__name__)
 
+import requests
+
+def check_api_health(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+    except requests.exceptions.RequestException:
+        return False
 
 class EvaluateSystem:
     def __init__(self,
@@ -28,7 +40,8 @@ class EvaluateSystem:
                  run_args=None,
                  use_run_name=True,
                  verbose=False,
-                 **kwargs
+                 sampling_args=None,
+                 **kwargs,
                  ):
         
         self.model = model
@@ -44,6 +57,10 @@ class EvaluateSystem:
         self.run_args = run_args
         self.verbose = verbose
 
+        while check_api_health(api_base.split("/v1")[0]+"/health") is False:
+            logger.info("API is not available, retrying...")
+            time.sleep(5)
+
         self.client = OpenAI(
             api_key=api_key,
             base_url=api_base,
@@ -53,14 +70,21 @@ class EvaluateSystem:
 
     def fetch_completion(self, messages, kwargs):
         try:
-            return self.client.chat.completions.create(
+            response = self.client.chat.completions.create(
                 messages=messages,
                 **kwargs,
             )
+            return {
+                "response": [
+                    response.choices[i].message.content
+                    for i in range(0, len(response.choices))
+                ],
+                "input_len": response.usage.prompt_tokens,
+                "output_len": response.usage.completion_tokens,
+            }
         except Exception as e:
             print(f"Error fetching chat completion: {e}")
             return None
-
 
     def run(self, temperature=0.1, top_p=1.0, repeat=1, seed=None):
         result_dict = {
@@ -115,11 +139,14 @@ class EvaluateSystem:
             except Exception as e:
                 print(f"Request {i} failed with error: {e}")
 
-
-        for ans, gt, inp, output_dict in tqdm(zip(ans_list, ground_truth, user_input, output_dict_list), total=len(ans_list)):
-            ans = self.dataset.extract_answer(ans)
-            score_dict = self.dataset.eval(ans, gt)
-            score_string = ", ".join([f"{metric}: {score}" for metric,score in score_dict.items()])
+        for ans, steps in tqdm(all_results):
+            output_dict = steps[-1]
+            inp = output_dict["full_input"]
+            gt = output_dict["ground_truth"]
+            score_dict = output_dict['eval']
+            score_string = ", ".join([
+                f"{metric}: {score}" for metric,score in score_dict.items()
+                ])
 
             if self.verbose:
                 logger.info(f"\nId: {idx}, {score_string}, Prediction: {ans}, Ground Truth: {gt}")
@@ -130,7 +157,7 @@ class EvaluateSystem:
                 else:
                     result_dict[metric] += score
 
-            result_dict["duration"] += output_dict["duration"]
+            # result_dict["duration"] += output_dict["duration"]
             result_dict["input_tokens"] += output_dict["input_len"]
             result_dict["output_tokens"] += output_dict["output_len"]
             result_dict["total_tokens"] += (output_dict["input_len"] + output_dict["output_len"])
@@ -141,7 +168,8 @@ class EvaluateSystem:
                     "ground_truth": gt,
                     "answer": ans,
                     "user_input": inp,
-                    **output_dict,
+                    # **output_dict,
+                    **steps,
                 }
             )
 
@@ -161,7 +189,7 @@ class EvaluateSystem:
         result_dict = {**self.run_args, **result_dict}
         for metric, score in score_dict.items():
             result_dict[f"avg_{metric}"] = result_dict[metric]/result_dict["n_samples"]
-        result_dict["avg_duration"] = result_dict["duration"]/result_dict["n_samples"]
+        # result_dict["avg_duration"] = result_dict["duration"]/result_dict["n_samples"]
         result_dict["avg_input_tokens"] = result_dict["input_tokens"]/result_dict["n_samples"]
         result_dict["avg_output_tokens"] = result_dict["output_tokens"]/result_dict["n_samples"]
         result_dict["avg_total_tokens"] = result_dict["total_tokens"]/result_dict["n_samples"]
