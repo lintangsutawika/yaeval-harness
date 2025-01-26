@@ -227,7 +227,15 @@ if __name__ == "__main__":
     all_results = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
-            executor.submit(all_task.run, idx, inference_fn=partial(fetch_completion, kwargs=kwargs), task_id="gsm8k_pipeline")
+            executor.submit(
+                all_task.run,
+                idx,
+                inference_fn=partial(
+                    fetch_completion,
+                    kwargs=kwargs
+                    ),
+                task_id="gsm8k_pipeline"
+            )
             for idx in range(0,10)
         ]
 
