@@ -1,11 +1,3 @@
-from .interface import (
-    SolverInterface,
-)
-
-INTERFACE = {
-    "default": SolverInterface,
-}
-
 SYSTEM_MESSAGE = {
     "none": "",
     "code": """\
