@@ -42,16 +42,8 @@ class Task:
         else:
             self.dataset = None
         self.preprocessor = preprocessor
-
-        if postprocessor is None:
-            self.postprocessor = lambda x, y: x[0]
-        else:
-            self.postprocessor = postprocessor
-
-        if inference_fn is None:
-            self.inference_fn = lambda x: x
-        else:
-            self.inference_fn = inference_fn
+        self.postprocessor = postprocessor or (lambda x, y: x['response'][0])
+        self.inference_fn = inference_fn or (lambda x: x)
 
         if tokenizer is not None:
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
@@ -59,15 +51,7 @@ class Task:
         else:
             self.tokenizer = None
 
-        if system_message is not None:
-            self.system_message = system_message
-        else:
-            self.system_message = None
-
-        if evaluation is not None:
-            self.eval = evaluation
-        else:
-            self.eval = lambda x, y: -1
+        self.system_message = system_message or None
 
         if isinstance(evaluation, Callable):
             self.evaluation = {"score": evaluation}
@@ -148,8 +132,11 @@ class Task:
 
     def eval(self, prediction, ground_truth):
         return {
-            eval_name: eval_fn(prediction, ground_truth) for eval_name, eval_fn in self.evaluation.items()
-            }
+            eval_name: eval_fn(
+                prediction, 
+                ground_truth
+            ) for eval_name, eval_fn in self.evaluation.items()
+        }
 
     def run_task(self, idx, state=None, inference_fn=None):
         # State is what?
@@ -166,8 +153,7 @@ class Task:
             o = self.inference_fn(x)
         else:
             o = inference_fn(x)
-
-        new_state["raw_output"] = o
+        new_state = {**new_state, **o}
         o = self.postprocess(o, state)
         new_state["output"] = o
         new_state["eval"] = self.eval(o, y)
@@ -222,14 +208,23 @@ if __name__ == "__main__":
         try:
             response = client.chat.completions.create(
                 messages=messages,
+                temperature=0.8, top_p=0.95,
                 **kwargs,
             )
-            return [response.choices[i].message.content for i in range(0, len(response.choices))]
+            return {
+                "response": [
+                    response.choices[i].message.content
+                    for i in range(0, len(response.choices))
+                ],
+                "input_token_len": response.usage.prompt_tokens,
+                "output_token_len": response.usage.completion_tokens,
+            }
         except Exception as e:
             print(f"Error fetching chat completion: {e}")
             return None
 
     # Use ThreadPoolExecutor for concurrent execution with a progress bar
+    all_results = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
             executor.submit(all_task.run, idx, inference_fn=partial(fetch_completion, kwargs=kwargs), task_id="gsm8k_pipeline")
@@ -239,7 +234,7 @@ if __name__ == "__main__":
         # Use tqdm to display a progress bar
         for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
             try:
-                result = future.result()
+                all_results.append(future.result())
                 # print(f"Request {i} succeeded with response: {result}")
             except Exception as e:
                 print(f"Request {i} failed with error: {e}")
