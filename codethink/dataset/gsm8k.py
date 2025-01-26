@@ -32,16 +32,15 @@ Answer:\nMichael started with 58 golf balls. After losing 23 on tuesday, he had 
 Question:\nOlivia has $23. She bought five bagels for $3 each. How much money does she have left?
 Answer:\
 """
-# Changed `The answer is` to `####`
     return fewshot_context
 
-
 def gsm8k_fewshot_output(x):
-    return "Olivia had 23 dollars. 5 bagels for 3 dollars each will be 5 x 3 = 15 dollars. So she has 23 - 15 dollars left. 23 - 15 is 8. #### 8."
+    return """\
+Olivia had 23 dollars. 5 bagels for 3 dollars each will be 5 x 3 = 15 dollars. So she has 23 - 15 dollars left. 23 - 15 is 8. #### 8.\
+"""
 
 def gsm8k_input(x):
-    # return "Question: " + x["question"] + "\nAnswer:"
-    return x["question"]
+    return f"Question:\n{x['question']}\nAnswer:"
 
 def gsm8k_output(x):
     answer = x["answer"]
@@ -69,9 +68,8 @@ GSM8KDataset = partial(
     output_text=gsm8k_output,
     fewshot_input_text=gsm8k_fewshot_input,
     fewshot_output_text=gsm8k_fewshot_output,
-    evaluation=gsm8k_eval,
     test_split="test",
-    # fewshot_split="train",
+    fewshot_split="train",
 )
 
 GSM8KRoutingDataset = partial(
@@ -80,7 +78,6 @@ GSM8KRoutingDataset = partial(
     data_name="main",
     input_text=lambda x: x['question']+"\n\nWhich method is the best way to solve this problem?", # Answer then write the solution.",
     output_text=lambda x: "programming language",
-    evaluation=lambda x, y: 1 if re.sub(r'[^\w\s]', '', x.lower()) == re.sub(r'[^\w\s]', '', y.lower()) else 0,
     test_split="test",
 )
 
