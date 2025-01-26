@@ -55,6 +55,11 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Postprocessing answer",
     )
     parser.add_argument(
+        "--serve", "-s",
+        action="store_true",
+        help="Serve model while also running evaluation",
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Sets verbose",
@@ -237,6 +242,35 @@ def main():
 
     run_name = args.run_name
 
+    if args.serve:
+
+        import requests
+
+        def check_api_health(url):
+            try:
+                response = requests.get(url)
+                if response.status_code == 200:
+                    return True
+                else:
+                    return False
+            except requests.exceptions.RequestException:
+                return False
+
+        def launch_vllm_serve():
+            # Construct the command to start the vLLM server
+            command = ["vllm", "serve", args.model_str, "--disable-log-stats"] 
+
+            # Start the process
+            process = subprocess.Popen(command)
+            return process
+
+        # Start the vLLM server
+        vllm_server = launch_vllm_serve()
+
+        url = "http://localhost:8000"
+        while not check_api_health(url+"/health"):
+            time.sleep(1)
+
     logger.info(f"Run: {run_name}")
     logger.info(
         "\n{} Run Configuration {}\n{}\n{}".format(
@@ -315,6 +349,14 @@ def main():
             repeat=args.repeat,
             seed=args.seed
         )
+
+    if args.serve:
+        def kill_vllm_serve(process):
+            process.terminate()
+            process.wait()
+
+        # Kill the vLLM server
+        kill_vllm_serve(vllm_server)
 
 if __name__ == "__main__":
 
