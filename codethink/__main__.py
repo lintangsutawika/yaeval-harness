@@ -37,6 +37,16 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Name of inference run",
     )
     parser.add_argument(
+        "--api_key",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--api_base",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--output_path",
         type=str,
         default=None,
@@ -248,18 +258,8 @@ def main():
     run_name = args.run_name
 
     if args.serve:
-
         import requests
-
-        def check_api_health(url):
-            try:
-                response = requests.get(url)
-                if response.status_code == 200:
-                    return True
-                else:
-                    return False
-            except requests.exceptions.RequestException:
-                return False
+        from codethink.utils import check_api_health
 
         def launch_vllm_serve():
             # Construct the command to start the vLLM server
@@ -276,7 +276,7 @@ def main():
         vllm_server = launch_vllm_serve()
 
         url = "http://localhost:8000"
-        while not check_api_health(url+"/health"):
+        while not check_api_health(url.split("/v1")[0]+"/health"):
             time.sleep(1)
 
     logger.info(f"Run: {run_name}")
@@ -345,10 +345,11 @@ def main():
             eval_dataset,
             run_name=task_run_name,
             output_path=args.output_path,
-            run_args=vars(args),
-            batch_size=args.batch_size,
+            inference_args=vars(args),
             verbose=args.verbose,
-            use_run_name=False if args.use_output_path_only == True else True,
+            use_run_name=(False
+                          if args.use_output_path_only else True
+                          ),
         )
 
         evaluator.run(
