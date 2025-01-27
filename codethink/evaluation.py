@@ -8,34 +8,20 @@ import concurrent.futures
 from openai import OpenAI
 from tqdm import tqdm
 
-from tqdm import tqdm
+from functools import partial
 from typing import List, Tuple
 from torch.utils.data import DataLoader
 
 from vllm import SamplingParams
-from codethink.utils import zeno_upload
+from codethink.utils import zeno_upload, check_api_health
 
 logger = logging.getLogger(__name__)
-
-import requests
-
-def check_api_health(url):
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return True
-        else:
-            return False
-    except requests.exceptions.RequestException:
-        return False
 
 class EvaluateSystem:
     def __init__(self,
                  model,
-                 task_list,
                  api_key="EMPTY",
                  api_base="http://localhost:8000/v1",
-                 run_name=None,
                  output_path=None,
                  run_args=None,
                  use_run_name=True,
@@ -45,19 +31,18 @@ class EvaluateSystem:
                  ):
         
         self.model = model
-        self.task_list = task_list
-
-        if run_name is None:
-            current_time = datetime.datetime.now()
-            self.run_name = current_time.strftime("%Y-%m-%d-%H:%M:%S")
-        else:
-            self.run_name = run_name
         self.output_path = output_path
-        self.use_run_name = use_run_name
         self.run_args = run_args
+        self.use_run_name = use_run_name
         self.verbose = verbose
 
-        while check_api_health(api_base.split("/v1")[0]+"/health") is False:
+        self.sampling_args = sampling_args or {}
+        self.sampling_args["model"] = model
+
+        while check_api_health(
+            api_base.split("/v1")[0]+"/health"
+            ) is False:
+
             logger.info("API is not available, retrying...")
             time.sleep(5)
 
@@ -66,14 +51,18 @@ class EvaluateSystem:
             base_url=api_base,
         )
 
-        self.kwargs["model"] = model
-
-    def fetch_completion(self, messages, kwargs):
+    def fetch_completion(self, messages, sampling_args=None):
+        if sampling_args is not None:
+            sampling_args = {**self.sampling_args, **sampling_args}
+        else:
+            sampling_args = self.sampling_args
         try:
+            print("messages:", messages)
             response = self.client.chat.completions.create(
                 messages=messages,
-                **kwargs,
+                **sampling_args,
             )
+            print(response)
             return {
                 "response": [
                     response.choices[i].message.content
@@ -86,7 +75,14 @@ class EvaluateSystem:
             print(f"Error fetching chat completion: {e}")
             return None
 
-    def run(self, temperature=0.1, top_p=1.0, repeat=1, seed=None):
+    def run(self, task, sampling_args=None, run_name=None, n_samples=None):
+
+        if run_name is None:
+            current_time = datetime.datetime.now()
+            self.run_name = current_time.strftime("%Y-%m-%d-%H:%M:%S")
+        else:
+            self.run_name = run_name
+
         result_dict = {
             "n_samples": 0,
             "duration": 0,
@@ -111,24 +107,20 @@ class EvaluateSystem:
 
         user_input = []
         ground_truth = []
-        for inp, out in self.dataset:
-            user_input.append(inp)
-            ground_truth.append(out)
+        # Use ThreadPoolExecutor for concurrent 
+        # execution with a progress bar
 
-        ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
-
-        # Use ThreadPoolExecutor for concurrent execution with a progress bar
+        n_samples = n_samples or task.__len__()
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [
                 executor.submit(
-                    all_task.run,
+                    task.infer,
                     idx,
                     inference_fn=partial(
-                        fetch_completion,
-                        kwargs=kwargs
+                        self.fetch_completion,
+                        sampling_args=sampling_args,
                     ),
-                    task_id="gsm8k_pipeline"
-                ) for idx in range(0,10)
+                ) for idx in range(n_samples)
             ]
 
         # Use tqdm to display a progress bar
@@ -140,7 +132,7 @@ class EvaluateSystem:
                 print(f"Request {i} failed with error: {e}")
 
         for ans, steps in tqdm(all_results):
-            output_dict = steps[-1]
+            output_dict = steps["step"][-1]
             inp = output_dict["full_input"]
             gt = output_dict["ground_truth"]
             score_dict = output_dict['eval']
@@ -186,7 +178,7 @@ class EvaluateSystem:
             idx += 1
         # zeno_upload(self.run_name, data_dict)
 
-        result_dict = {**self.run_args, **result_dict}
+        # result_dict = {**self.run_args, **result_dict}
         for metric, score in score_dict.items():
             result_dict[f"avg_{metric}"] = result_dict[metric]/result_dict["n_samples"]
         # result_dict["avg_duration"] = result_dict["duration"]/result_dict["n_samples"]
