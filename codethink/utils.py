@@ -108,3 +108,12 @@ def is_runnable_code(text_string, answer_expr='solution()', time_out=10):
     else:
         return False
 
+def check_api_health(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+    except requests.exceptions.RequestException:
+        return False
