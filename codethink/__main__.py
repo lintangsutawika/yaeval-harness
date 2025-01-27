@@ -197,6 +197,11 @@ def setup_parser() -> argparse.ArgumentParser:
         default=None,
         type=str,
     )
+    parser.add_argument(
+        "--server_args",
+        default=None,
+        type=str,
+    )
     return parser
 
 def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
@@ -259,6 +264,9 @@ def main():
         def launch_vllm_serve():
             # Construct the command to start the vLLM server
             command = ["vllm", "serve", args.model_str, "--disable-log-stats"] 
+            if args.server_args:
+                server_args_dict = simple_parse_args_string(args.server_args)
+                command += [item for kv_pair in server_args_dict.items() for item in kv_pair]
 
             # Start the process
             process = subprocess.Popen(command)
