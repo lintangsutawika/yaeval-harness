@@ -11,9 +11,9 @@ from .utils import extract_fn
 
 class TransformedDataset(Dataset):
     def __init__(self,
-                 name: str=None,
                  data_path: str,
                  data_name: str=None,
+                 name: str=None,
                  input_text: Union[str, Callable]=None,
                  output_text: Union[str, Callable]=None,
                  preprocessing: Callable=None,

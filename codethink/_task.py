@@ -1,7 +1,7 @@
 import os
 
 from typing import Union, Callable, Dict
-from codethink import SYSTEM_MESSAGE
+from codethink._system_message import SYSTEM_MESSAGE
 
 from transformers import AutoTokenizer
 # Task
@@ -23,6 +23,10 @@ def match_fn(x, y):
         return 0
 
 class Task:
+
+    SUBTASK_LIST = None
+
+
     def __init__(self,
                  name,
                  subtask_list: list = None,
@@ -36,7 +40,7 @@ class Task:
                  evaluation: Union[str, Dict[str, Callable]]="match",
                  ):
         self.name = name
-        self.subtask_list = subtask_list
+        self.subtask_list = subtask_list or self.SUBTASK_LIST
         if dataset is not None:
             self.dataset = dataset(**dataset_kwargs)
         else:
@@ -66,25 +70,37 @@ class Task:
     def set_tokenizer(self, tokenizer):
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
 
-    def run(self, idx, task_id=None, inference_fn=None):
+    def __len__(self):
+        if self.dataset is None:
+            return self.subtask_list[0].__len__()
+        return len(self.dataset)
+
+    def infer(self, idx, inference_fn=None):
         state = {
-            "task_id": task_id,
             "sample_id": idx,
             "current_step": 0,
             "step": []
             }
 
         if self.subtask_list is None:
-            output, _state = self.run_task(idx, state)
-            state["step"].append({"step_id": 0, "task": self.name, **_state})
+            output, _state = self.run_step(idx, state)
+            state["step"].append(
+                {"step_id": 0,
+                 "task": self.name,
+                 **_state}
+            )
             return output, state
 
         for _id, task in enumerate(self.subtask_list):
-            output, _state = task.run_task(idx,
-                                          state=state,
-                                          inference_fn=inference_fn
-                                          )
-            state["step"].append({"step_id": _id, "task": task.name, **_state})
+            output, _state = task.run_step(idx,
+                                           state=state,
+                                           inference_fn=inference_fn
+                                           )
+            state["step"].append(
+                {"step_id": _id,
+                 "task": task.name,
+                 **_state}
+            )
             state["current_step"] += 1
         return output, state
 
@@ -138,14 +154,14 @@ class Task:
             ) for eval_name, eval_fn in self.evaluation.items()
         }
 
-    def run_task(self, idx, state=None, inference_fn=None):
+    def run_step(self, idx, state=None, inference_fn=None):
         # State is what?
         # evals, inputs, outputs 
         # Accumulate states
         new_state = {}
         x, y = self.dataset.__getitem__(idx)
         new_state["raw_input"] = x
-        new_state["groud_truth"] = y
+        new_state["ground_truth"] = y
         x, state = self.preprocess(x, state)
         x = self.build_message(x, state)
         new_state["full_input"] = x
@@ -228,7 +244,7 @@ if __name__ == "__main__":
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
             executor.submit(
-                all_task.run,
+                all_task.infer,
                 idx,
                 inference_fn=partial(
                     fetch_completion,
