@@ -1,10 +1,12 @@
 import re
 from functools import partial
 
-try:
-    from codethink.dataset.data import TransformedDataset
-except:
-    from data import TransformedDataset
+from . import register_task
+
+from codethink._task import Task
+from codethink._data import TransformedDataset
+
+from codethink.utils import is_runnable_code
 
 def gsm8k_fewshot_input(x):
     fewshot_context = """\
@@ -80,6 +82,43 @@ GSM8KRoutingDataset = partial(
     output_text=lambda x: "programming language",
     test_split="test",
 )
+
+def preprocess_PL_or_NL(x, state):
+    current_step = state["current_step"]
+    solve_with = state["step"][current_step-1]["output"]
+    if solve_with == "programming language":
+        state["system_message"] = "code"
+    elif solve_with == "natural language":
+        state["system_message"] = "cot"
+    return x, state
+
+def postprocess_PL_or_NL(x, state):
+    current_step = state["current_step"]
+    solve_with = state["step"][current_step-1]["output"]
+    if solve_with == "programming language":
+        x = is_runnable_code(x) 
+    elif solve_with == "natural language":
+        x = x.split("#### ")[-1]
+    return x, state
+
+
+
+@register_task("gsm8k_routing_nl_first")
+class GSM8KRoutingTask(Task):
+    SUBTASK_LIST=[
+        Task(
+            name="gsm8k_routing",
+            dataset=GSM8KRoutingDataset,
+            system_message="routing_selection_nl_first",
+        ),
+        Task(
+            name="gsm8k_solve",
+            dataset=GSM8KDataset,
+            preprocessor=preprocess_PL_or_NL,
+            postprocessor=postprocess_PL_or_NL,
+        ),
+    ]
+
 
 if __name__ == "__main__":
 
