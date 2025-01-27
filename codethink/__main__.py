@@ -1,7 +1,8 @@
 import os
 import sys
 import logging
-
+import requests
+import subprocess
 logging.basicConfig(
     format="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
     datefmt="%Y-%m-%d:%H:%M:%S",
@@ -14,7 +15,7 @@ import importlib.util
 
 from codethink.utils import simple_parse_args_string
 # from codethink import INTERFACE, SYSTEM_MESSAGE
-# from codethink.dataset import DATASET as TASK_LIST
+from codethink.dataset import TASK_LIST
 from codethink.evaluation import EvaluateSystem
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
-        "--model_str", "-m", type=str, help="Name of model e.g. `hf`"
+        "--model", "-m", type=str, help="Name of model e.g. `hf`"
     )
     parser.add_argument(
         "--inference_mode", "-i",
@@ -171,7 +172,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--n_samples",
         default=None,
-        type=str,
+        type=int,
         help="Number of samples to infer on",
     )
     parser.add_argument(
@@ -257,13 +258,18 @@ def main():
 
     run_name = args.run_name
 
+    api_key = args.api_key or "EMPTY"
+    api_base = args.api_base or "http://localhost:8000/v1"
+
     if args.serve:
+        import time
         import requests
+        import subprocess
         from codethink.utils import check_api_health
 
         def launch_vllm_serve():
             # Construct the command to start the vLLM server
-            command = ["vllm", "serve", args.model_str, "--disable-log-stats"] 
+            command = ["vllm", "serve", args.model, "--disable-log-stats"] 
             if args.server_args:
                 server_args_dict = simple_parse_args_string(args.server_args)
                 command += [item for kv_pair in server_args_dict.items() for item in kv_pair]
@@ -322,41 +328,32 @@ def main():
     for task in task_list:
         logger.info(f"Task: {task}")
         if run_name is None:
-            task_run_name = f"{args.model_str}-{task}-{args.system_message}"
+            task_run_name = f"{args.model}-{task}-{args.system_message}"
         else:
             if len(task_list) > 1:
                 task_run_name = f"{run_name}-{task}-{args.system_message}"
             else:
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
-        eval_dataset = ALL_TASK_LIST[task](
-            num_fewshot=args.num_fewshot,
-            sampler=None,
-            n_samples=args.n_samples,
-            data_kwargs=data_kwargs,
-            **task_kwargs,
-        )
 
         evaluator = EvaluateSystem(
-            api_key=args.api_key,
-            api_base=args.api_base,
-            inference_kwargs=args.inference_kwargs,
-            model_system=model_system,
-            eval_dataset,
-            run_name=task_run_name,
-            output_path=args.output_path,
-            inference_args=vars(args),
-            verbose=args.verbose,
-            use_run_name=(False
-                          if args.use_output_path_only else True
-                          ),
-        )
+            model=args.model,
+            api_key=api_key,
+            api_base=api_base,
+            #inference_kwargs=args.inference_kwargs,
+            #model_system=model_system,
+            #eval_dataset,
+            #run_name=task_run_name,
+            #output_path=args.output_path,
+            #inference_args=vars(args),
+            #verbose=args.verbose,
+            #use_run_name=~args.use_output_path_only
+            )
 
         evaluator.run(
-            temperature=args.temperature,
-            top_p=args.top_p,
-            repeat=args.repeat,
-            seed=args.seed
+            ALL_TASK_LIST[task](),
+            run_name=task_run_name,
+            n_samples=args.n_samples
         )
 
     if args.serve:
