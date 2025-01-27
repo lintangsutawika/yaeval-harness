@@ -1,4 +1,6 @@
+import re
 import sys
+import requests
 import subprocess
 import pandas as pd
 # from zeno_client import ZenoClient, ZenoMetric
@@ -117,3 +119,16 @@ def check_api_health(url):
             return False
     except requests.exceptions.RequestException:
         return False
+
+def extract_fn(answer: str):
+    try:
+        extracted_answer = answer.split('####')[-1].strip()
+        if extracted_answer == answer:
+            match = re.search(r"answer is(\w)", answer)
+            if match:
+                return match.group(1)
+            else:
+                return answer
+        return extracted_answer
+    except:
+	    return answer
