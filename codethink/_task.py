@@ -1,5 +1,5 @@
 import os
-
+from functools import partial
 from typing import Union, Callable, Dict
 from codethink._system_message import SYSTEM_MESSAGE
 
@@ -23,8 +23,15 @@ def match_fn(x, y):
         return 0
 
 class Task:
-
+    NAME = None
     SUBTASK_LIST = None
+    DATASET = None
+    DATASET_KWARGS = {}
+    PREPROCESSOR = None
+    POSTPROCESSOR = None
+    INFERENCE_FN = None
+    SYSTEM_MESSAGE = None
+    EVALUATION = None
 
 
     def __init__(self,
@@ -32,58 +39,51 @@ class Task:
                  subtask_list: list = None,
                  dataset = None,
                  dataset_kwargs: dict = {},
-                 preprocessor: callable = None,
-                 postprocessor: callable = None,
+                 preprocessor: callable = lambda x, y: (x, y),
+                 postprocessor: callable = lambda x, y: (x['response'][0], y),
                  inference_fn: callable = None,
                  tokenizer: str = None,
                  system_message: str = None,
                  evaluation: Union[str, Dict[str, Callable]]="match",
                  ):
-        self.name = name
-        self.subtask_list = subtask_list or self.SUBTASK_LIST
-        if dataset is not None:
-            self.dataset = dataset(**dataset_kwargs)
-        else:
-            self.dataset = None
-        self.preprocessor = preprocessor
-        self.postprocessor = postprocessor or (lambda x, y: x['response'][0])
-        self.inference_fn = inference_fn or (lambda x: x)
+        self.name = self.NAME or name
+        self.subtask_list = self.SUBTASK_LIST or subtask_list
+        self.dataset = self.DATASET or dataset
+        self.dataset_kwargs = self.DATASET_KWARGS or dataset_kwargs
+        if self.dataset is not None:
+            self.dataset = self.dataset(**dataset_kwargs)
+        
+        self.preprocessor = self.PREPROCESSOR or preprocessor
+        self.postprocessor = self.POSTPROCESSOR or postprocessor
+        self.inference_fn = self.INFERENCE_FN or inference_fn
+        self.system_message = self.SYSTEM_MESSAGE or system_message
 
-        if tokenizer is not None:
-            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
-            [task.set_tokenizer(tokenizer) for task in self.subtask_list]
-        else:
-            self.tokenizer = None
-
-        self.system_message = system_message or None
-
-        if isinstance(evaluation, Callable):
-            self.evaluation = {"score": evaluation}
-        elif isinstance(evaluation, str):
-            if evaluation == "match":
+        self.evaluation = self.EVALUATION or evaluation
+        if isinstance(self.evaluation, Callable):
+            self.evaluation = {"score": self.evaluation}
+        elif isinstance(self.evaluation, str):
+            if self.evaluation == "match":
                 self.evaluation = {"match": match_fn}
             else:
                 raise NotImplementedError
-        else:
-            self.evaluation = evaluation
-
-    def set_tokenizer(self, tokenizer):
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
 
     def __len__(self):
         if self.dataset is None:
             return self.subtask_list[0].__len__()
         return len(self.dataset)
 
-    def infer(self, idx, inference_fn=None):
+    def infer(self, idx, inference_fn=None, system_message=None):
         state = {
             "sample_id": idx,
             "current_step": 0,
             "step": []
             }
 
+        if system_message is not None:
+            self.system_message = system_message
+
         if self.subtask_list is None:
-            output, _state = self.run_step(idx, state)
+            output, _state = self.run_step(idx, state, inference_fn=inference_fn)
             state["step"].append(
                 {"step_id": 0,
                  "task": self.name,
@@ -132,12 +132,6 @@ class Task:
                 0, 
                 {"role": "system", "content": system_message}
                 )
-        elif self.tokenizer is not None:
-            message = self.tokenizer.apply_chat_template(
-                message,
-                tokenize=False,
-                add_generation_prompt=True,
-                )
         return message
 
     def extract_answer(self, prediction):
@@ -170,10 +164,32 @@ class Task:
         else:
             o = inference_fn(x)
         new_state = {**new_state, **o}
-        o = self.postprocess(o, state)
+        o, state = self.postprocess(o, state)
         new_state["output"] = o
         new_state["eval"] = self.eval(o, y)
         return o, new_state
+
+def create_task(
+    name: str = None,
+    subtask_list: list = None,
+    dataset = None,
+    preprocessor: callable = lambda x, y: (x, y),
+    postprocessor: callable = lambda x, y: (x['response'][0], y),
+    inference_fn: callable = None,
+    system_message: str = None,
+    evaluation: Union[str, Dict[str, Callable]]="match",
+    ):
+    return partial(Task, 
+                name=name,
+                subtask_list=subtask_list,
+                dataset=dataset,
+                preprocessor=preprocessor,
+                postprocessor=postprocessor,
+                inference_fn=inference_fn,
+                system_message=system_message,
+                evaluation=evaluation,
+                )
+
 
 if __name__ == "__main__":
     import concurrent.futures
