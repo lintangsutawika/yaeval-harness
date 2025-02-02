@@ -53,6 +53,7 @@ def num_glue_eval(prediction, ground_truth):
 
     return score
 
+num_glue_tasks = {}
 for num in range(1,9):
     num_glue_tasks[f'type-{num}'] = partial(
         TransformedDataset,
@@ -62,7 +63,6 @@ for num in range(1,9):
         },
         input_text=num_glue_input,
         output_text=num_glue_output,
-        evaluation=num_glue_eval,
         test_split="test",
         fewshot_split="test",
     )
@@ -70,9 +70,10 @@ for num in range(1,9):
 def preprocess_routing(x, state):
     current_step = state["current_step"]
     solve_with = state["step"][current_step-1]["output"]
-    if solve_with == "programming language":
+    if "programming language" in solve_with:
         state["system_message"] = "code"
-    elif solve_with == "natural language":
+    # elif "natural language" in solve_with:
+    else:
         state["system_message"] = "cot"
     return x, state
 
@@ -80,14 +81,99 @@ def postprocess_routing(x, state):
     x = x["response"][0]
     current_step = state["current_step"]
     solve_with = state["step"][current_step-1]["output"]
-    if solve_with == "programming language":
+    if "programming language" in solve_with:
         x = is_runnable_code(x) 
-    elif solve_with == "natural language":
+    # elif "natural language" in solve_with:
+    else:
         try:
             x = x.split("answer is")[-1].strip()
         except:
             pass
     return x, state
+
+def postprocess_PL_or_NL(x, state):
+    x = x["response"][0]
+    exec_result = is_runnable_code(x) 
+    if exec_result:
+        return exec_result, state
+    else:
+        try:
+            x = x.split("answer is")[-1].strip()
+        except:
+            pass
+    return x, state
+
+@register_task(
+    "numglue_type_1",
+    dataset=num_glue_tasks["type-1"],
+    evaluation={"accuracy": num_glue_eval},
+    postprocessor=postprocess_PL_or_NL,
+)
+class NumGLUEType1(Task):
+    pass
+
+@register_task(
+    "numglue_type_2",
+    dataset=num_glue_tasks["type-2"],
+    evaluation={"accuracy": num_glue_eval},
+    postprocessor=postprocess_PL_or_NL,
+)
+class NumGLUEType2(Task):
+    pass
+
+@register_task(
+    "numglue_type_3",
+    dataset=num_glue_tasks["type-3"],
+    evaluation={"accuracy": num_glue_eval},
+    postprocessor=postprocess_PL_or_NL,
+)
+class NumGLUEType3(Task):
+    pass
+
+@register_task(
+    "numglue_type_4",
+    dataset=num_glue_tasks["type-4"],
+    evaluation={"accuracy": num_glue_eval},
+    postprocessor=postprocess_PL_or_NL,
+)
+class NumGLUEType4(Task):
+    pass
+
+@register_task(
+    "numglue_type_5",
+    dataset=num_glue_tasks["type-5"],
+    evaluation={"accuracy": num_glue_eval},
+    postprocessor=postprocess_PL_or_NL,
+)
+class NumGLUEType5(Task):
+    pass
+
+@register_task(
+    "numglue_type_6",
+    dataset=num_glue_tasks["type-6"],
+    evaluation={"accuracy": num_glue_eval},
+    postprocessor=postprocess_PL_or_NL,
+)
+class NumGLUEType6(Task):
+    pass
+
+@register_task(
+    "numglue_type_7",
+    dataset=num_glue_tasks["type-7"],
+    evaluation={"accuracy": num_glue_eval},
+    postprocessor=postprocess_PL_or_NL,
+)
+class NumGLUEType7(Task):
+    pass
+
+@register_task(
+    "numglue_type_8",
+    dataset=num_glue_tasks["type-8"],
+    evaluation={"accuracy": num_glue_eval},
+    postprocessor=postprocess_PL_or_NL,
+)
+class NumGLUEType8(Task):
+    pass
 
 @register_task(
     "numglue_type_1_routing_pl_first",
@@ -103,12 +189,166 @@ def postprocess_routing(x, state):
         Task(
             name="numglue_type_1",
             dataset=num_glue_tasks["type-1"],
-            preprocess=preprocess_routing,
-            postprocess=postprocess_routing,
+            preprocessor=preprocess_routing,
+            postprocessor=postprocess_routing,
             evaluation={"accuracy": num_glue_eval},
         ),
     ])
-class NumGLUEType1(Task):
+class NumGLUEType1Routing(Task):
+    pass
+
+@register_task(
+    "numglue_type_2_routing_pl_first",
+    subtask_list=[
+        Task(
+            name="numglue_type_2_routing",
+            dataset=partial(
+                num_glue_tasks["type-2"],
+                input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
+            ),
+            system_message="routing_selection_pl_first",
+        ),
+        Task(
+            name="numglue_type_2",
+            dataset=num_glue_tasks["type-2"],
+            preprocessor=preprocess_routing,
+            postprocessor=postprocess_routing,
+            evaluation={"accuracy": num_glue_eval},
+        ),
+    ])
+class NumGLUEType2Routing(Task):
+    pass
+
+@register_task(
+    "numglue_type_3_routing_pl_first",
+    subtask_list=[
+        Task(
+            name="numglue_type_3_routing",
+            dataset=partial(
+                num_glue_tasks["type-3"],
+                input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
+            ),
+            system_message="routing_selection_pl_first",
+        ),
+        Task(
+            name="numglue_type_3",
+            dataset=num_glue_tasks["type-3"],
+            preprocessor=preprocess_routing,
+            postprocessor=postprocess_routing,
+            evaluation={"accuracy": num_glue_eval},
+        ),
+    ])
+class NumGLUEType3Routing(Task):
+    pass
+
+@register_task(
+    "numglue_type_4_routing_pl_first",
+    subtask_list=[
+        Task(
+            name="numglue_type_4_routing",
+            dataset=partial(
+                num_glue_tasks["type-4"],
+                input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
+            ),
+            system_message="routing_selection_pl_first",
+        ),
+        Task(
+            name="numglue_type_4",
+            dataset=num_glue_tasks["type-4"],
+            preprocessor=preprocess_routing,
+            postprocessor=postprocess_routing,
+            evaluation={"accuracy": num_glue_eval},
+        ),
+    ])
+class NumGLUEType4Routing(Task):
+    pass
+
+@register_task(
+    "numglue_type_5_routing_pl_first",
+    subtask_list=[
+        Task(
+            name="numglue_type_5_routing",
+            dataset=partial(
+                num_glue_tasks["type-5"],
+                input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
+            ),
+            system_message="routing_selection_pl_first",
+        ),
+        Task(
+            name="numglue_type_5",
+            dataset=num_glue_tasks["type-5"],
+            preprocessor=preprocess_routing,
+            postprocessor=postprocess_routing,
+            evaluation={"accuracy": num_glue_eval},
+        ),
+    ])
+class NumGLUEType5Routing(Task):
+    pass
+
+@register_task(
+    "numglue_type_6_routing_pl_first",
+    subtask_list=[
+        Task(
+            name="numglue_type_6_routing",
+            dataset=partial(
+                num_glue_tasks["type-6"],
+                input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
+            ),
+            system_message="routing_selection_pl_first",
+        ),
+        Task(
+            name="numglue_type_6",
+            dataset=num_glue_tasks["type-6"],
+            preprocessor=preprocess_routing,
+            postprocessor=postprocess_routing,
+            evaluation={"accuracy": num_glue_eval},
+        ),
+    ])
+class NumGLUEType6Routing(Task):
+    pass
+
+@register_task(
+    "numglue_type_7_routing_pl_first",
+    subtask_list=[
+        Task(
+            name="numglue_type_7_routing",
+            dataset=partial(
+                num_glue_tasks["type-7"],
+                input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
+            ),
+            system_message="routing_selection_pl_first",
+        ),
+        Task(
+            name="numglue_type_7",
+            dataset=num_glue_tasks["type-7"],
+            preprocessor=preprocess_routing,
+            postprocessor=postprocess_routing,
+            evaluation={"accuracy": num_glue_eval},
+        ),
+    ])
+class NumGLUEType7Routing(Task):
+    pass
+
+@register_task(
+    "numglue_type_8_routing_pl_first",
+    subtask_list=[
+        Task(
+            name="numglue_type_8_routing",
+            dataset=partial(
+                num_glue_tasks["type-8"],
+                input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
+            ),
+            system_message="routing_selection_pl_first",
+        ),
+        Task(
+            name="numglue_type_8",
+            dataset=num_glue_tasks["type-8"],
+            preprocessor=preprocess_routing,
+            postprocessor=postprocess_routing,
+            evaluation={"accuracy": num_glue_eval},
+        ),
+    ])
+class NumGLUEType8Routing(Task):
     pass
 
 if __name__ == "__main__":
