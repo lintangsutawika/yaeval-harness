@@ -2,10 +2,7 @@ import re
 import ast
 from functools import partial
 
-try:
-    from codethink.dataset.data import TransformedDataset
-except:
-    from data import TransformedDataset
+from codethink._data import TransformedDataset
 
 def math_input(x):
     return x['problem']

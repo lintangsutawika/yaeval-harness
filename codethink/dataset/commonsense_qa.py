@@ -2,10 +2,10 @@ import re
 import os
 from functools import partial
 
-from . import register_task
+from codethink.dataset import register_task
 
 from codethink._task import Task
-from codethink._dataset import TransformedDataset
+from codethink._data import TransformedDataset
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -50,7 +50,7 @@ CommonsenseQARoutingDataset = partial(
 @register_task(
     "commonsense_qa_routing",
     dataset=CommonsenseQARoutingDataset,
-    postprocess=lambda x, state: x["response"][0].split("\n\n")[0].strip(),
+    postprocessor=lambda x, state: x["response"][0].split("\n\n")[0].strip(),
     evaluation=lambda x, y: 1 if re.sub(r'[^\w\s]', '', x.lower()) == re.sub(r'[^\w\s]', '', y.lower()) else 0,
     )
 class CommonsenseQARoutingTask(Task):

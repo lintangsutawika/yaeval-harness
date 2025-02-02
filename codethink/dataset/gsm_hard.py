@@ -1,10 +1,7 @@
 import re
 from functools import partial
 
-try:
-    from codethink.dataset.data import TransformedDataset
-except:
-    from data import TransformedDataset
+from codethink._data import TransformedDataset
 
 def gsm8k_fewshot_input(x):
     fewshot_context = """\

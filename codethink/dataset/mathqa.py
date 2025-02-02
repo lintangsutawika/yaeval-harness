@@ -2,10 +2,7 @@ import re
 import ast
 from functools import partial
 
-try:
-    from codethink.dataset.data import TransformedDataset
-except:
-    from data import TransformedDataset
+from codethink._data import TransformedDataset
 
 def mathqa_input(x):
     return f"Question:\n{x['Problem']}\n{x['options']}\nAnswer:"

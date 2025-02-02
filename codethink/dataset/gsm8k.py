@@ -1,7 +1,7 @@
 import re
 from functools import partial
 
-from . import register_task
+from codethink.dataset import register_task
 
 from codethink._task import Task, create_task
 from codethink._data import TransformedDataset
@@ -140,13 +140,13 @@ class GSM8KRoutingTask(Task):
 @register_task(
     "gsm8k_routing_nl_first",
     subtask_list=[
-        Task(
+        create_task(
             name="gsm8k_routing",
             dataset=GSM8KRoutingDataset,
             system_message="routing_selection_nl_first",
             evaluation={"accuracy": lambda x, y: x.split("\n\n")[0].lower() == y.lower()},
         ),
-        Task(
+        create_task(
             name="gsm8k_solve",
             dataset=GSM8KDataset,
             preprocessor=preprocess_routing,
@@ -160,13 +160,13 @@ class GSM8KRoutingATask(Task):
 @register_task(
     "gsm8k_routing_pl_first",
     subtask_list=[
-        Task(
+        create_task(
             name="gsm8k_routing",
             dataset=GSM8KRoutingDataset,
             system_message="routing_selection_pl_first",
             evaluation={"accuracy": lambda x, y: x.split("\n\n")[0].lower() == y.lower()},
         ),
-        Task(
+        create_task(
             name="gsm8k_solve",
             dataset=GSM8KDataset,
             preprocessor=preprocess_routing,

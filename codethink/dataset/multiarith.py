@@ -1,9 +1,6 @@
 from functools import partial
 
-try:
-    from codethink.dataset.data import TransformedDataset
-except:
-    from data import TransformedDataset
+from codethink._data import TransformedDataset
 
 def multiarith_input(x):
     return "Question:\n"+x['question'].strip()+"\nAnswer:"

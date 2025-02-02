@@ -3,10 +3,7 @@
 import os
 from functools import partial
 
-try:
-    from codethink.dataset.data import TransformedDataset
-except:
-    from data import TransformedDataset
+from codethink._data import TransformedDataset
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 

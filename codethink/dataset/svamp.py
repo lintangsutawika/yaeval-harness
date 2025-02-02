@@ -1,7 +1,5 @@
 from functools import partial
-
-from codethink.dataset.data import TransformedDataset
-# from data import TransformedDataset
+from codethink._data import TransformedDataset
 
 def svamp_input(x):
     return "Question:\n"+x["question_concat"]+"\nAnswer:"
