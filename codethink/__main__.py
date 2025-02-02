@@ -272,10 +272,11 @@ def main():
             command = ["vllm", "serve", args.model, "--disable-log-stats"] 
             if args.server_args:
                 server_args_dict = simple_parse_args_string(args.server_args)
-                command += [item for kv_pair in server_args_dict.items() for item in kv_pair]
+                server_args_dict = {f"--{k}":v for k,v in server_args_dict.items() if v is not None}
+                command += [str(item) for kv_pair in server_args_dict.items() for item in kv_pair]
 
             # Start the process
-            process = subprocess.Popen(command)
+            process = subprocess.Popen(command, env={**os.environ, "VLLM_CONFIGURE_LOGGING": "0"})
             return process
 
         # Start the vLLM server
@@ -308,6 +309,21 @@ def main():
 
         # args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
 
+    evaluator = EvaluateSystem(
+        model=args.model,
+        api_key=api_key,
+        api_base=api_base,
+        #inference_kwargs=args.inference_kwargs,
+        #model_system=model_system,
+        #eval_dataset,
+        #run_name=task_run_name,
+        system_message=args.system_message,
+        output_path=args.output_path,
+        #inference_args=vars(args),
+        #verbose=args.verbose,
+        use_run_name=~args.use_output_path_only
+        )
+
     if args.include_path is not None:
         ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
         ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
@@ -336,22 +352,9 @@ def main():
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
 
-        evaluator = EvaluateSystem(
-            model=args.model,
-            api_key=api_key,
-            api_base=api_base,
-            #inference_kwargs=args.inference_kwargs,
-            #model_system=model_system,
-            #eval_dataset,
-            #run_name=task_run_name,
-            #output_path=args.output_path,
-            #inference_args=vars(args),
-            #verbose=args.verbose,
-            #use_run_name=~args.use_output_path_only
-            )
-
         evaluator.run(
             ALL_TASK_LIST[task](),
+            # sampling_args=args.sample_args,
             run_name=task_run_name,
             n_samples=args.n_samples
         )
