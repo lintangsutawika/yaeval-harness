@@ -3,7 +3,7 @@ from functools import partial
 
 from . import register_task
 
-from codethink._task import Task
+from codethink._task import Task, create_task
 from codethink._data import TransformedDataset
 
 from codethink.utils import is_runnable_code
@@ -52,12 +52,12 @@ def gsm8k_output(x):
 
 def gsm8k_eval(prediction, ground_truth):
     try:
-        prediction = str(prediction).replace(",", "")
+        prediction = str(prediction).replace(",", "").replace(".", "").replace("$", "")
         prediction = float(prediction)
         ground_truth = float(ground_truth)
         score = 1 if abs(prediction - ground_truth) < 1e-3 else 0
     except Exception as e:
-        print("Exception:", e)
+        # print("Exception:", e)
         score = 0
 
     return score
@@ -83,42 +83,99 @@ GSM8KRoutingDataset = partial(
     test_split="test",
 )
 
-def preprocess_PL_or_NL(x, state):
+def preprocess_routing(x, state):
     current_step = state["current_step"]
-    solve_with = state["step"][current_step-1]["output"]
+    solve_with = state["step"][current_step-1]["output"].split("\n")[0]
     if solve_with == "programming language":
         state["system_message"] = "code"
     elif solve_with == "natural language":
         state["system_message"] = "cot"
     return x, state
 
-def postprocess_PL_or_NL(x, state):
+def postprocess_routing(x, state):
+    x = x["response"][0]
     current_step = state["current_step"]
     solve_with = state["step"][current_step-1]["output"]
     if solve_with == "programming language":
         x = is_runnable_code(x) 
     elif solve_with == "natural language":
-        x = x.split("#### ")[-1]
+        try:
+            x = x.split("answer is")[-1].strip()
+        except:
+            pass
     return x, state
 
+def postprocess_PL_or_NL(x, state):
+    x = x["response"][0]
+    exec_result = is_runnable_code(x) 
+    if exec_result:
+        return exec_result, state
+    else:
+        try:
+            x = x.split("answer is")[-1].strip()
+        except:
+            pass
+    return x, state
 
+@register_task(
+    "gsm8k_solve",
+    dataset=GSM8KDataset,
+    postprocessor=postprocess_PL_or_NL,
+    evaluation={"accuracy": gsm8k_eval},
+    )
+class GSM8KTask(Task):
+    pass
 
-@register_task("gsm8k_routing_nl_first")
+@register_task(
+    "gsm8k_routing",
+    dataset=GSM8KRoutingDataset,
+    postprocessor=lambda x, state: x["response"][0].split("\n\n")[0],
+    evaluation={
+        "accuracy": lambda x, y: 1 if re.sub(r'[^\w\s]', '', x.lower()) == re.sub(r'[^\w\s]', '', y.lower()) else 0,
+        }
+    )
 class GSM8KRoutingTask(Task):
-    SUBTASK_LIST=[
+    pass
+
+@register_task(
+    "gsm8k_routing_nl_first",
+    subtask_list=[
         Task(
             name="gsm8k_routing",
             dataset=GSM8KRoutingDataset,
             system_message="routing_selection_nl_first",
+            evaluation={"accuracy": lambda x, y: x.split("\n\n")[0].lower() == y.lower()},
         ),
         Task(
             name="gsm8k_solve",
             dataset=GSM8KDataset,
-            preprocessor=preprocess_PL_or_NL,
-            postprocessor=postprocess_PL_or_NL,
+            preprocessor=preprocess_routing,
+            postprocessor=postprocess_routing,
+            evaluation={"accuracy": gsm8k_eval},
         ),
-    ]
+    ])
+class GSM8KRoutingATask(Task):
+    pass
 
+@register_task(
+    "gsm8k_routing_pl_first",
+    subtask_list=[
+        Task(
+            name="gsm8k_routing",
+            dataset=GSM8KRoutingDataset,
+            system_message="routing_selection_pl_first",
+            evaluation={"accuracy": lambda x, y: x.split("\n\n")[0].lower() == y.lower()},
+        ),
+        Task(
+            name="gsm8k_solve",
+            dataset=GSM8KDataset,
+            preprocessor=preprocess_routing,
+            postprocessor=postprocess_routing,
+            evaluation={"accuracy": gsm8k_eval},
+        ),
+    ])
+class GSM8KRoutingBTask(Task):
+    pass
 
 if __name__ == "__main__":
 
