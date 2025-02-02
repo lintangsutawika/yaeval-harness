@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import logging
 import datetime
 import jsonlines
@@ -27,6 +28,7 @@ class EvaluateSystem:
                  use_run_name=True,
                  verbose=False,
                  sampling_args=None,
+                 system_message=None,
                  **kwargs,
                  ):
         
@@ -51,18 +53,18 @@ class EvaluateSystem:
             base_url=api_base,
         )
 
+        self.system_message = system_message
+
     def fetch_completion(self, messages, sampling_args=None):
         if sampling_args is not None:
             sampling_args = {**self.sampling_args, **sampling_args}
         else:
             sampling_args = self.sampling_args
         try:
-            print("messages:", messages)
             response = self.client.chat.completions.create(
                 messages=messages,
                 **sampling_args,
             )
-            print(response)
             return {
                 "response": [
                     response.choices[i].message.content
@@ -120,16 +122,18 @@ class EvaluateSystem:
                         self.fetch_completion,
                         sampling_args=sampling_args,
                     ),
+                    system_message=self.system_message,
                 ) for idx in range(n_samples)
             ]
 
-        # Use tqdm to display a progress bar
-        all_results = []
-        for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
-            try:
-                all_results.append(future.result())
-            except Exception as e:
-                print(f"Request {i} failed with error: {e}")
+            # Use tqdm to display a progress bar
+            all_results = []
+            for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
+                try:
+                    all_results.append(future.result())
+                except Exception as e:
+                    # print(f"Request {i} failed with error: {e}")
+                    pass
 
         for ans, steps in tqdm(all_results):
             output_dict = steps["step"][-1]
@@ -160,7 +164,7 @@ class EvaluateSystem:
                     "ground_truth": gt,
                     "answer": ans,
                     "user_input": inp,
-                    # **output_dict,
+                    **output_dict,
                     **steps,
                 }
             )
@@ -207,7 +211,7 @@ class EvaluateSystem:
                 with jsonlines.open(output_file, "w") as file:
                     file.write_all(output_json)
             except Exception as e:
-                print(e)
+                print("Error:", e)
 
         return 0
 
