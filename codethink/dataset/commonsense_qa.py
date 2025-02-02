@@ -2,10 +2,10 @@ import re
 import os
 from functools import partial
 
-try:
-    from codethink.dataset.data import TransformedDataset
-except:
-    from data import TransformedDataset
+from . import register_task
+
+from codethink._task import Task
+from codethink._dataset import TransformedDataset
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -44,9 +44,17 @@ CommonsenseQARoutingDataset = partial(
     data_path="tau/commonsense_qa",
     input_text=lambda x: x['question']+"\n\nWhich method is the best way to solve this problem?",
     output_text=lambda x: "natural language",
-    evaluation=lambda x, y: 1 if re.sub(r'[^\w\s]', '', x.lower()) == re.sub(r'[^\w\s]', '', y.lower()) else 0,
     test_split="validation",
 )
+
+@register_task(
+    "commonsense_qa_routing",
+    dataset=CommonsenseQARoutingDataset,
+    postprocess=lambda x, state: x["response"][0].split("\n\n")[0].strip(),
+    evaluation=lambda x, y: 1 if re.sub(r'[^\w\s]', '', x.lower()) == re.sub(r'[^\w\s]', '', y.lower()) else 0,
+    )
+class CommonsenseQARoutingTask(Task):
+    pass
 
 
 if __name__ == "__main__":
