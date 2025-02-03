@@ -185,6 +185,7 @@ class NumGLUEType8(Task):
                 input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
             ),
             system_message="routing_selection_pl_first",
+            sampling_args={"stop": "\n\n"},
         ),
         Task(
             name="numglue_type_1",
@@ -207,6 +208,7 @@ class NumGLUEType1Routing(Task):
                 input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
             ),
             system_message="routing_selection_pl_first",
+            sampling_args={"stop": "\n\n"},
         ),
         Task(
             name="numglue_type_2",
@@ -229,6 +231,7 @@ class NumGLUEType2Routing(Task):
                 input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
             ),
             system_message="routing_selection_pl_first",
+            sampling_args={"stop": "\n\n"},
         ),
         Task(
             name="numglue_type_3",
@@ -251,6 +254,7 @@ class NumGLUEType3Routing(Task):
                 input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
             ),
             system_message="routing_selection_pl_first",
+            sampling_args={"stop": "\n\n"},
         ),
         Task(
             name="numglue_type_4",
@@ -273,6 +277,7 @@ class NumGLUEType4Routing(Task):
                 input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
             ),
             system_message="routing_selection_pl_first",
+            sampling_args={"stop": "\n\n"},
         ),
         Task(
             name="numglue_type_5",
@@ -295,6 +300,7 @@ class NumGLUEType5Routing(Task):
                 input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
             ),
             system_message="routing_selection_pl_first",
+            sampling_args={"stop": "\n\n"},
         ),
         Task(
             name="numglue_type_6",
@@ -317,6 +323,7 @@ class NumGLUEType6Routing(Task):
                 input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
             ),
             system_message="routing_selection_pl_first",
+            sampling_args={"stop": "\n\n"},
         ),
         Task(
             name="numglue_type_7",
@@ -339,6 +346,7 @@ class NumGLUEType7Routing(Task):
                 input_text=lambda x: num_glue_input(x).replace("\nAnswer:", "")+"\n\nWhich method is the best way to solve this problem?",
             ),
             system_message="routing_selection_pl_first",
+            sampling_args={"stop": "\n\n"},
         ),
         Task(
             name="numglue_type_8",
