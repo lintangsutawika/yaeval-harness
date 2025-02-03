@@ -15,6 +15,7 @@ def register_task(name,
                   inference_fn=None,
                   system_message=None,
                   evaluation=None,
+                  sampling_args=None,
                   ):
     def decorator(obj):
         obj = partial(obj,
@@ -26,6 +27,7 @@ def register_task(name,
                       inference_fn=inference_fn,
                       system_message=system_message,
                       evaluation=evaluation,
+                      sampling_args=sampling_args,
                       )
         TASK_LIST[name] = obj
         globals()[name] = obj
