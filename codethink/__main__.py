@@ -6,7 +6,7 @@ import subprocess
 logging.basicConfig(
     format="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
     datefmt="%Y-%m-%d:%H:%M:%S",
-    level=logging.INFO,
+    level=logging.WARNING,
 )
 
 import argparse
@@ -213,6 +213,11 @@ def setup_parser() -> argparse.ArgumentParser:
         default=None,
         type=str,
     )
+    parser.add_argument(
+        "--sample_args",
+        default=None,
+        type=str,
+    )
     return parser
 
 def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
@@ -286,8 +291,8 @@ def main():
         while not check_api_health(url.split("/v1")[0]+"/health"):
             time.sleep(1)
 
-    logger.info(f"Run: {run_name}")
-    logger.info(
+    logger.warning(f"Run: {run_name}")
+    logger.warning(
         "\n{} Run Configuration {}\n{}\n{}".format(
             "#"*33, "#"*33,
             "\n".join([" "*(32-len(key))+f"{key}: {value}" for key, value in vars(args).items()]),
@@ -296,7 +301,7 @@ def main():
         )
 
     if args.trust_remote_code:
-        logger.info(
+        logger.warning(
             "Passed `--trust_remote_code`, setting environment variable `HF_DATASETS_TRUST_REMOTE_CODE=true`"
         )
         # Adopted from https://github.com/EleutherAI/lm-evaluation-harness.git
@@ -354,7 +359,7 @@ def main():
 
         evaluator.run(
             ALL_TASK_LIST[task](),
-            # sampling_args=args.sample_args,
+            sampling_args=simple_parse_args_string(args.sample_args) if args.sample_args else None,
             run_name=task_run_name,
             n_samples=args.n_samples
         )
