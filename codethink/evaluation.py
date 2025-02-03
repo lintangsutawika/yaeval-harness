@@ -29,6 +29,7 @@ class EvaluateSystem:
                  verbose=False,
                  sampling_args=None,
                  system_message=None,
+                 max_requests=128,
                  **kwargs,
                  ):
         
@@ -37,6 +38,7 @@ class EvaluateSystem:
         self.run_args = run_args
         self.use_run_name = use_run_name
         self.verbose = verbose
+        self.max_requests = max_requests
 
         self.sampling_args = sampling_args or {}
         self.sampling_args["model"] = model
@@ -60,6 +62,7 @@ class EvaluateSystem:
             sampling_args = {**self.sampling_args, **sampling_args}
         else:
             sampling_args = self.sampling_args
+
         try:
             response = self.client.chat.completions.create(
                 messages=messages,
@@ -113,27 +116,45 @@ class EvaluateSystem:
         # execution with a progress bar
 
         n_samples = n_samples or task.__len__()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [
-                executor.submit(
-                    task.infer,
-                    idx,
-                    inference_fn=partial(
-                        self.fetch_completion,
-                        sampling_args=sampling_args,
-                    ),
-                    system_message=self.system_message,
-                ) for idx in range(n_samples)
-            ]
 
-            # Use tqdm to display a progress bar
-            all_results = []
-            for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
-                try:
-                    all_results.append(future.result())
-                except Exception as e:
-                    # print(f"Request {i} failed with error: {e}")
-                    pass
+        def chunk_len(num, max_request):
+            ranges = []
+            n = num//max_request
+            for i in range(n):
+                ranges.append((0+i*max_request,max_request+i*max_request))
+            
+            modulo = num%max_request
+            if modulo > 0:
+                ranges.append((n*max_request, n*max_request+modulo))
+            
+            return ranges
+
+        all_results = []
+        chunks = chunk_len(n_samples, self.max_requests)
+        #for chunk in tqdm(chunks):
+        for chunk in [0]:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                futures = [
+                    executor.submit(
+                        task.infer,
+                        idx,
+                        inference_fn=self.fetch_completion,
+                        sampling_args=sampling_args,
+                        system_message=self.system_message,
+                    #) for idx in range(chunk[0], chunk[1])
+                    ) for idx in range(n_samples)
+                ]
+
+                # Use tqdm to display a progress bar
+                all_results = []
+                for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
+                # for i, future in enumerate(concurrent.futures.as_completed(futures)):
+                    try:
+                        all_results.append(future.result())
+                    except Exception as e:
+                        # print(f"Request {i} failed with error: {e}")
+                        pass
+                #all_results.extend(results)
 
         for ans, steps in tqdm(all_results):
             output_dict = steps["step"][-1]
@@ -189,8 +210,8 @@ class EvaluateSystem:
         result_dict["avg_input_tokens"] = result_dict["input_tokens"]/result_dict["n_samples"]
         result_dict["avg_output_tokens"] = result_dict["output_tokens"]/result_dict["n_samples"]
         result_dict["avg_total_tokens"] = result_dict["total_tokens"]/result_dict["n_samples"]
-        logger.info(f"{self.run_name} complete")
-        logger.info(
+        logger.warning(f"{self.run_name} complete")
+        logger.warning(
             ",".join(
                 [f"{metric}: {result_dict[f'avg_{metric}']}" for metric in score_dict.keys()]
                 )
@@ -215,73 +236,3 @@ class EvaluateSystem:
 
         return 0
 
-class OracleEvaluation(EvaluateSystem):
-
-    def run(self, temperature=0.1, top_p=1.0, repeat=1, seed=None):
-
-        result_dict = {
-            "n_samples": 0,
-            "score": 0,
-            "duration": 0,
-            "total_tokens": 0,
-            "input_tokens": 0,
-            "output_tokens": 0,
-        }
-        output_json = []
-        idx = 0
-
-        while True:
-            for sample in tqdm(self.data_loader):
-                user_input, ground_truth = sample
-
-                ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
-
-                for ans, gt, inp, output_dict in zip(ans_list, ground_truth, user_input, output_dict_list):
-                    score = self.dataset.eval(ans, gt)
-
-                    if float(score) != 1.0:
-                        ans, gt, inp, 
-
-                    # if self.verbose:
-                    logger.info(f"\nId: {idx}, Score: {score}, Prediction: {ans}, Ground Truth: {gt}")
-                    result_dict["n_samples"] += 1
-                    result_dict["score"] += score
-                    result_dict["duration"] += output_dict["duration"]
-                    result_dict["input_tokens"] += output_dict["input_len"]
-                    result_dict["output_tokens"] += output_dict["output_len"]
-                    result_dict["total_tokens"] += (output_dict["input_len"] + output_dict["output_len"])
-                    output_json.append(
-                        {
-                            "idx": idx,
-                            "score": score,
-                            "ground_truth": gt,
-                            "answer": ans,
-                            "user_input": inp,
-                            **output_dict,
-                        }
-                    )
-
-        result_dict = {**self.run_args, **result_dict}
-        result_dict["avg_score"] = result_dict["score"]/result_dict["n_samples"]
-        result_dict["avg_duration"] = result_dict["duration"]/result_dict["n_samples"]
-        result_dict["avg_input_tokens"] = result_dict["input_tokens"]/result_dict["n_samples"]
-        result_dict["avg_output_tokens"] = result_dict["output_tokens"]/result_dict["n_samples"]
-        result_dict["avg_total_tokens"] = result_dict["total_tokens"]/result_dict["n_samples"]
-        logger.info(f"{self.run_name} complete")
-        logger.info("Score: {}".format(result_dict["avg_score"]))
-
-        if self.output_path is not None:
-            run_path = os.path.join(self.output_path, self.run_name)
-            os.makedirs(run_path, exist_ok=True)
-            result_file = os.path.join(run_path, "result.json")
-            with open(result_file, 'w', encoding='utf-8') as file:
-                json.dump(result_dict, file, ensure_ascii=False, indent=4)
-
-            try:
-                output_file = os.path.join(run_path, "output.jsonl")
-                with jsonlines.open(output_file, "w") as file:
-                    file.write_all(output_json)
-            except Exception as e:
-                print(e)
-
-        return 0

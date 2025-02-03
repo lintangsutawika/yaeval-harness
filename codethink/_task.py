@@ -45,6 +45,7 @@ class Task:
                  tokenizer: str = None,
                  system_message: str = None,
                  evaluation: Union[str, Dict[str, Callable]]="match",
+                 sampling_args: dict = {},
                  ):
         self.name = self.NAME or name
         self.subtask_list = self.SUBTASK_LIST or subtask_list
@@ -67,12 +68,14 @@ class Task:
             else:
                 raise NotImplementedError
 
+        self.sampling_args = sampling_args or {}
+
     def __len__(self):
         if self.dataset is None:
             return self.subtask_list[0].__len__()
         return len(self.dataset)
 
-    def infer(self, idx, inference_fn=None, system_message=None):
+    def infer(self, idx, inference_fn=None, sampling_args=None, system_message=None):
         state = {
             "sample_id": idx,
             "current_step": 0,
@@ -82,8 +85,11 @@ class Task:
         if system_message is not None:
             self.system_message = system_message
 
+        if sampling_args is not None:
+            self.sampling_args = {**self.sampling_args, **sampling_args}
+
         if self.subtask_list is None:
-            output, _state = self.run_step(idx, state, inference_fn=inference_fn)
+            output, _state = self.run_step(idx, state, inference_fn=inference_fn, sampling_args=self.sampling_args)
             state["step"].append(
                 {"step_id": 0,
                  "task": self.name,
@@ -92,9 +98,12 @@ class Task:
             return output, state
 
         for _id, task in enumerate(self.subtask_list):
+
+            self.sampling_args = {**sampling_args, **task.sampling_args}
             output, _state = task.run_step(idx,
                                            state=state,
-                                           inference_fn=inference_fn
+                                           inference_fn=inference_fn,
+                                           sampling_args=self.sampling_args,
                                            )
             state["step"].append(
                 {"step_id": _id,
@@ -148,10 +157,11 @@ class Task:
             ) for eval_name, eval_fn in self.evaluation.items()
         }
 
-    def run_step(self, idx, state=None, inference_fn=None):
+    def run_step(self, idx, state=None, inference_fn=None, sampling_args=None):
         # State is what?
         # evals, inputs, outputs 
         # Accumulate states
+        sampling_args = sampling_args or {}
         new_state = {}
         x, y = self.dataset.__getitem__(idx)
         new_state["raw_input"] = x
@@ -160,9 +170,9 @@ class Task:
         x = self.build_message(x, state)
         new_state["full_input"] = x
         if inference_fn is None:
-            o = self.inference_fn(x)
+            o = self.inference_fn(x, sampling_args)
         else:
-            o = inference_fn(x)
+            o = inference_fn(x, sampling_args)
         new_state = {**new_state, **o}
         o, state = self.postprocess(o, state)
         new_state["output"] = o
