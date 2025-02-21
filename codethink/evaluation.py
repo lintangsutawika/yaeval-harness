@@ -32,7 +32,7 @@ class EvaluateSystem:
                  max_requests=128,
                  **kwargs,
                  ):
-        
+
         self.model = model
         self.output_path = output_path
         self.run_args = run_args
@@ -122,40 +122,34 @@ class EvaluateSystem:
             n = num//max_request
             for i in range(n):
                 ranges.append((0+i*max_request,max_request+i*max_request))
-            
+
             modulo = num%max_request
             if modulo > 0:
                 ranges.append((n*max_request, n*max_request+modulo))
-            
+
             return ranges
 
-        all_results = []
-        chunks = chunk_len(n_samples, self.max_requests)
-        #for chunk in tqdm(chunks):
-        for chunk in [0]:
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                futures = [
-                    executor.submit(
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [
+                executor.submit(
                         task.infer,
                         idx,
                         inference_fn=self.fetch_completion,
                         sampling_args=sampling_args,
                         system_message=self.system_message,
-                    #) for idx in range(chunk[0], chunk[1])
                     ) for idx in range(n_samples)
                 ]
 
-                # Use tqdm to display a progress bar
-                all_results = []
-                for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
-                # for i, future in enumerate(concurrent.futures.as_completed(futures)):
-                    try:
-                        all_results.append(future.result())
-                    except Exception as e:
-                        # print(f"Request {i} failed with error: {e}")
-                        pass
-                #all_results.extend(results)
+            all_results = []
+            for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
+                all_results.append(future.result())
+                #try:
+                #    all_results.append(future.result())
+                #except Exception as e:
+                #    print(f"Request {i} failed with error: {e}")
+                #    pass
 
+        # all_results = [x for x in sorted(all_results, key=lambda x: x["sample_id"])]
         for ans, steps in tqdm(all_results):
             output_dict = steps["step"][-1]
             inp = output_dict["full_input"]
