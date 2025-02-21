@@ -28,8 +28,9 @@ class TransformedDataset(Dataset):
                  answer_delimiter: str="\n",
                  n_samples: Union[int, float]=None,
                  data_kwargs: dict=None,
+                 batch_processing: bool=False,
                  ):
-        
+
         if name is None:
             if data_name is None:
                 self.name = f"{data_path}"
@@ -40,7 +41,7 @@ class TransformedDataset(Dataset):
 
         if data_kwargs is None:
             data_kwargs = {}
-        
+
         if "data_files" in data_kwargs:
             data_name = data_kwargs["data_files"]
             data_kwargs.pop("data_files")
@@ -72,7 +73,7 @@ class TransformedDataset(Dataset):
         self.use_fewshot_input = False
         if fewshot_input_text is not None:
             self.use_fewshot_input = True
-        
+
         self.use_fewshot_output = False
         if fewshot_output_text is not None:
              self.use_fewshot_output = True
@@ -97,7 +98,6 @@ class TransformedDataset(Dataset):
             all_split.append(self.fewshot_split)
 
         for split in all_split:
-            
             if n_samples is not None:
                 try:
                     n_samples = eval(n_samples)
@@ -125,8 +125,15 @@ class TransformedDataset(Dataset):
             if self.use_fewshot_output:
                 self.dataset[split] = self.dataset[split].map(partial(_transform, fn=fewshot_output_text, feature="__fewshot_output__"))
 
-            self.dataset[split] = self.dataset[split].map(partial(_transform, fn=input_text, feature="__input__"))
-            self.dataset[split] = self.dataset[split].map(partial(_transform, fn=output_text, feature="__output__"))
+            self.dataset[split] = self.dataset[split].map(
+                    partial(
+                        _transform, fn=input_text, feature="__input__"),
+                    batched=batch_processing
+                    )
+            self.dataset[split] = self.dataset[split].map(
+                    partial(_transform, fn=output_text, feature="__output__"),
+                    batched=batch_processing
+                    )
 
         if self.num_fewshot > 0:
             if self.sampler is None:
@@ -138,7 +145,7 @@ class TransformedDataset(Dataset):
                 sample_idx = list(range(self.num_fewshot))
             else:
                 raise NotImplemented
-            
+
             fewshot_samples = self.get_fewshot(sample_idx)
             self.dataset[test_split] = self.dataset[test_split].map(partial(_transform, fn=prepend_fewshot, feature="__input__", fewshot_samples=fewshot_samples))
 
