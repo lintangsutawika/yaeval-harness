@@ -26,12 +26,6 @@ def setup_parser() -> argparse.ArgumentParser:
         "--model", "-m", type=str, help="Name of model e.g. `hf`"
     )
     parser.add_argument(
-        "--inference_mode", "-i",
-        type=str,
-        default="default",
-        help="Solve task by generating code or other test time inference approaches"
-    )
-    parser.add_argument(
         "--run_name",
         type=str,
         default=None,
@@ -204,6 +198,11 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
     )
     parser.add_argument(
+        "--keep",
+        action="store_true",
+        help="Keep the server running",
+    )
+    parser.add_argument(
         "--include_path",
         default=None,
         type=str,
@@ -330,10 +329,13 @@ def main():
         )
 
     if args.include_path is not None:
-        ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
-        ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
-    else:
-        ALL_TASK_LIST = TASK_LIST
+        from codethink.dataset import import_modules
+        logger.warning(f"Importing modules from {args.include_path}")
+        import_modules(args.include_path)
+        #ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
+        # ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
+    #else:
+    ALL_TASK_LIST = TASK_LIST
 
     if args.data_kwargs is not None:
         data_kwargs = eval(args.data_kwargs)
@@ -364,7 +366,7 @@ def main():
             n_samples=args.n_samples
         )
 
-    if args.serve:
+    if args.serve and (args.keep == False):
         def kill_vllm_serve(process):
             process.terminate()
             process.wait()
