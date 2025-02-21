@@ -4,17 +4,6 @@ from typing import Union, Callable, Dict
 from codethink._system_message import SYSTEM_MESSAGE
 
 from transformers import AutoTokenizer
-# Task
-# Do initial inference of task
-# Do parallel process?
-# Route strings? i.e `next='task_name'`
-# Merge and stuff
-
-# Dataset
-# Should fewshot be hardcoded?
-# Should postprocessing change the dataset name? Or Task name?
-
-# Build Instances, sample_id, task_id
 
 def match_fn(x, y):
     try:
@@ -48,16 +37,19 @@ class Task:
                  sampling_args: dict = {},
                  ):
         self.name = self.NAME or name
-        self.subtask_list = self.SUBTASK_LIST or subtask_list
+        if subtask_list is not None:
+            self.subtask_list = [task() for task in subtask_list]
+        else:
+            self.subtask_list = None
         self.dataset = self.DATASET or dataset
         self.dataset_kwargs = self.DATASET_KWARGS or dataset_kwargs
         if self.dataset is not None:
             self.dataset = self.dataset(**dataset_kwargs)
-        
-        self.preprocessor = self.PREPROCESSOR or preprocessor
-        self.postprocessor = self.POSTPROCESSOR or postprocessor
-        self.inference_fn = self.INFERENCE_FN or inference_fn
-        self.system_message = self.SYSTEM_MESSAGE or system_message
+
+        self.preprocessor = preprocessor
+        self.postprocessor = postprocessor
+        self.inference_fn = inference_fn
+        self.system_message = system_message
 
         self.evaluation = self.EVALUATION or evaluation
         if isinstance(self.evaluation, Callable):
@@ -111,6 +103,7 @@ class Task:
                  **_state}
             )
             state["current_step"] += 1
+
         return output, state
 
     def preprocess(self, x, state=None):
@@ -158,9 +151,6 @@ class Task:
         }
 
     def run_step(self, idx, state=None, inference_fn=None, sampling_args=None):
-        # State is what?
-        # evals, inputs, outputs 
-        # Accumulate states
         sampling_args = sampling_args or {}
         new_state = {}
         x, y = self.dataset.__getitem__(idx)
@@ -188,6 +178,7 @@ def create_task(
     inference_fn: callable = None,
     system_message: str = None,
     evaluation: Union[str, Dict[str, Callable]]="match",
+    sampling_args: dict = {},
     ):
     return partial(Task, 
                 name=name,
@@ -198,6 +189,7 @@ def create_task(
                 inference_fn=inference_fn,
                 system_message=system_message,
                 evaluation=evaluation,
+                sampling_args=sampling_args,
                 )
 
 
@@ -207,7 +199,7 @@ if __name__ == "__main__":
     from tqdm import tqdm
     from functools import partial
     from codethink.dataset.gsm8k import GSM8KDataset, GSM8KRoutingDataset
-    
+
     def preprocess_PL_or_NL(x, state):
         current_step = state["current_step"]
         solve_with = state["step"][current_step-1]["output"]
