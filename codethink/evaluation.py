@@ -5,8 +5,9 @@ import logging
 import datetime
 import jsonlines
 import concurrent.futures
+import asyncio
 
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 from tqdm import tqdm
 
 from functools import partial
@@ -29,7 +30,7 @@ class EvaluateSystem:
                  verbose=False,
                  sampling_args=None,
                  system_message=None,
-                 max_requests=128,
+                 max_rps=200,
                  **kwargs,
                  ):
 
@@ -38,7 +39,7 @@ class EvaluateSystem:
         self.run_args = run_args
         self.use_run_name = use_run_name
         self.verbose = verbose
-        self.max_requests = max_requests
+        self.max_rps = max_rps
 
         self.sampling_args = sampling_args or {}
         self.sampling_args["model"] = model
@@ -51,6 +52,7 @@ class EvaluateSystem:
             time.sleep(5)
 
         self.client = OpenAI(
+        # self.client = AsyncOpenAI(
             api_key=api_key,
             base_url=api_base,
         )
@@ -129,7 +131,8 @@ class EvaluateSystem:
 
             return ranges
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        #n_ranges = chunk_len(n_samples, self.max_rps)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=256) as executor:
             futures = [
                 executor.submit(
                         task.infer,
@@ -148,8 +151,20 @@ class EvaluateSystem:
                 #except Exception as e:
                 #    print(f"Request {i} failed with error: {e}")
                 #    pass
-
+        #all_task = [
+        #    task.infer(
+        #        idx,
+        #        inference_fn=self.fetch_completion,
+        #        sampling_args=sampling_args,
+        #        system_message=self.system_message
+        #        ) for idx in range(n_samples)
+        #]
+        #chat_completions = await asyncio.gather(*tasks)
+        #successful_completions = [c for c in tqdm(chat_completions) if c is not None]
+        #print(successful_completions[0])
+        #import sys; sys.exit()
         # all_results = [x for x in sorted(all_results, key=lambda x: x["sample_id"])]
+
         for ans, steps in tqdm(all_results):
             output_dict = steps["step"][-1]
             inp = output_dict["full_input"]
