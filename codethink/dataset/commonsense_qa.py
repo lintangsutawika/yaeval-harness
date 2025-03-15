@@ -7,6 +7,8 @@ from codethink.dataset import register_task
 from codethink._task import Task
 from codethink._data import TransformedDataset
 
+from codethink.utils import is_runnable_code
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 def cqa_input(x):
@@ -35,7 +37,6 @@ CommonsenseQADataset = partial(
     data_path="tau/commonsense_qa",
     input_text=cqa_input,
     output_text=cqa_output,
-    evaluation=cqa_eval,
     test_split="validation",
 )
 
@@ -47,11 +48,42 @@ CommonsenseQARoutingDataset = partial(
     test_split="validation",
 )
 
+def postprocess_PL_or_NL(x, state):
+    x = x["response"][0]
+    exec_result = is_runnable_code(x) 
+    if exec_result:
+        return exec_result, state
+    else:
+        try:
+            x = x.split("answer is")[-1].strip()
+        except:
+            pass
+    return x, state
+
 @register_task(
-    "commonsense_qa_routing",
+    "commonsense_qa",
+    dataset=CommonsenseQADataset,
+    postprocessor=postprocess_PL_or_NL,
+    evaluation={"accuracy": cqa_eval},
+    )
+class CommonsenseQATask(Task):
+    pass
+
+def match_routing(prediction, ground_truth):
+    prediction = prediction.strip().lower()
+    ground_truth = ground_truth.strip().lower()
+    if re.sub(r'[^\w\s]', '', prediction) == re.sub(r'[^\w\s]', '', ground_truth):
+        return 1
+    elif ground_truth in prediction:
+        return 1
+    return 0
+
+@register_task(
+    "routing_commonsense_qa",
     dataset=CommonsenseQARoutingDataset,
-    postprocessor=lambda x, state: x["response"][0].split("\n\n")[0].strip(),
-    evaluation=lambda x, y: 1 if re.sub(r'[^\w\s]', '', x.lower()) == re.sub(r'[^\w\s]', '', y.lower()) else 0,
+    postprocessor=lambda x, state: (x["response"][0], state),
+    sampling_args={"stop": ["\n\n", "\n"]},
+    evaluation={"accuracy": match_routing},
     )
 class CommonsenseQARoutingTask(Task):
     pass

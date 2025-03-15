@@ -8,6 +8,8 @@ from codethink._data import TransformedDataset
 
 from codethink.utils import is_runnable_code
 
+from codethink.dataset.utils import get_boxed_answer, math_eval
+
 def gsm8k_fewshot_input(x):
     fewshot_context = """\
 Question:\nThere are 15 trees in the grove. Grove workers will plant trees in the grove today. After they are done, there will be 21 trees. How many trees did the grove workers plant today?
@@ -118,7 +120,16 @@ def postprocess_PL_or_NL(x, state):
     return x, state
 
 @register_task(
-    "gsm8k_solve",
+    "gsm8k_boxed",
+    dataset=GSM8KDataset,
+    postprocessor=get_boxed_answer,
+    evaluation={"accuracy": math_eval},
+    )
+class GSM8KBoxedTask(Task):
+    pass
+
+@register_task(
+    "gsm8k",
     dataset=GSM8KDataset,
     postprocessor=postprocess_PL_or_NL,
     evaluation={"accuracy": gsm8k_eval},
@@ -126,24 +137,35 @@ def postprocess_PL_or_NL(x, state):
 class GSM8KTask(Task):
     pass
 
+def match_routing(prediction, ground_truth):
+    prediction = prediction.strip().lower()
+    ground_truth = ground_truth.strip().lower()
+    if re.sub(r'[^\w\s]', '', prediction) == re.sub(r'[^\w\s]', '', ground_truth):
+        return 1
+    elif ground_truth in prediction:
+        return 1
+    return 0
+
 @register_task(
-    "gsm8k_routing",
+    "routing_gsm8k",
     dataset=GSM8KRoutingDataset,
-    postprocessor=lambda x, state: x["response"][0].split("\n\n")[0],
+    postprocessor=lambda x, state: (x["response"][0], state),
+    sampling_args={"stop": ["\n\n", "\n"]},
     evaluation={
-        "accuracy": lambda x, y: 1 if re.sub(r'[^\w\s]', '', x.lower()) == re.sub(r'[^\w\s]', '', y.lower()) else 0,
+        "accuracy": match_routing,
         }
     )
 class GSM8KRoutingTask(Task):
     pass
 
 @register_task(
-    "gsm8k_routing_nl_first",
+    "gsm8k-routing_pipeline_nl_first",
     subtask_list=[
         create_task(
             name="gsm8k_routing",
             dataset=GSM8KRoutingDataset,
             system_message="routing_selection_nl_first",
+            sampling_args={"stop": ["\n\n", "\n"]},
             evaluation={"accuracy": lambda x, y: x.split("\n\n")[0].lower() == y.lower()},
         ),
         create_task(
@@ -158,12 +180,13 @@ class GSM8KRoutingATask(Task):
     pass
 
 @register_task(
-    "gsm8k_routing_pl_first",
+    "gsm8k-routing_pipeline_pl_first",
     subtask_list=[
         create_task(
             name="gsm8k_routing",
             dataset=GSM8KRoutingDataset,
             system_message="routing_selection_pl_first",
+            sampling_args={"stop": ["\n\n", "\n"]},
             evaluation={"accuracy": lambda x, y: x.split("\n\n")[0].lower() == y.lower()},
         ),
         create_task(

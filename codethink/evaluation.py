@@ -6,9 +6,10 @@ import datetime
 import jsonlines
 import concurrent.futures
 import asyncio
+from tqdm.asyncio import tqdm
 
 from openai import OpenAI, AsyncOpenAI
-from tqdm import tqdm
+# from tqdm import tqdm
 
 from functools import partial
 from typing import List, Tuple
@@ -30,7 +31,7 @@ class EvaluateSystem:
                  verbose=False,
                  sampling_args=None,
                  system_message=None,
-                 max_rps=200,
+                 max_rps=500,
                  **kwargs,
                  ):
 
@@ -51,22 +52,22 @@ class EvaluateSystem:
             logger.info("API is not available, retrying...")
             time.sleep(5)
 
-        self.client = OpenAI(
-        # self.client = AsyncOpenAI(
+        # self.client = OpenAI(
+        self.client = AsyncOpenAI(
             api_key=api_key,
             base_url=api_base,
         )
 
         self.system_message = system_message
 
-    def fetch_completion(self, messages, sampling_args=None):
+    async def fetch_completion(self, messages, sampling_args=None):
         if sampling_args is not None:
             sampling_args = {**self.sampling_args, **sampling_args}
         else:
             sampling_args = self.sampling_args
 
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 messages=messages,
                 **sampling_args,
             )
@@ -78,11 +79,17 @@ class EvaluateSystem:
                 "input_len": response.usage.prompt_tokens,
                 "output_len": response.usage.completion_tokens,
             }
+        except asyncio.CancelledError:
+            return None
         except Exception as e:
             print(f"Error fetching chat completion: {e}")
-            return None
+            return {
+                    "response": [],
+                    "input_len": 0,
+                    "output_len": 0,
+            }
 
-    def run(self, task, sampling_args=None, run_name=None, n_samples=None):
+    async def run(self, task, sampling_args=None, run_name=None, n_samples=None):
 
         if run_name is None:
             current_time = datetime.datetime.now()
@@ -131,36 +138,38 @@ class EvaluateSystem:
 
             return ranges
 
-        #n_ranges = chunk_len(n_samples, self.max_rps)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=256) as executor:
-            futures = [
-                executor.submit(
-                        task.infer,
-                        idx,
-                        inference_fn=self.fetch_completion,
-                        sampling_args=sampling_args,
-                        system_message=self.system_message,
-                    ) for idx in range(n_samples)
-                ]
+        n_ranges = chunk_len(n_samples, self.max_rps)
+        #with concurrent.futures.ThreadPoolExecutor(max_workers=256) as executor:
+        #    futures = [
+        #        executor.submit(
+        #                task.infer,
+        #                idx,
+        #                inference_fn=self.fetch_completion,
+        #                sampling_args=sampling_args,
+        #                system_message=self.system_message,
+        #            ) for idx in range(n_samples)
+        #        ]
 
-            all_results = []
-            for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
-                all_results.append(future.result())
+        #    all_results = []
+        #    for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
+        #        all_results.append(future.result())
                 #try:
                 #    all_results.append(future.result())
                 #except Exception as e:
                 #    print(f"Request {i} failed with error: {e}")
                 #    pass
-        #all_task = [
-        #    task.infer(
-        #        idx,
-        #        inference_fn=self.fetch_completion,
-        #        sampling_args=sampling_args,
-        #        system_message=self.system_message
-        #        ) for idx in range(n_samples)
-        #]
-        #chat_completions = await asyncio.gather(*tasks)
-        #successful_completions = [c for c in tqdm(chat_completions) if c is not None]
+        all_results = []
+        for n_range in n_ranges:
+            all_task = [
+                task.infer(
+                    idx,
+                    inference_fn=self.fetch_completion,
+                    sampling_args=sampling_args,
+                    system_message=self.system_message
+                    ) for idx in range(*n_range)
+            ]
+            chat_completions = await tqdm.gather(*all_task)
+            all_results.extend([c for c in chat_completions if c is not None])
         #print(successful_completions[0])
         #import sys; sys.exit()
         # all_results = [x for x in sorted(all_results, key=lambda x: x["sample_id"])]

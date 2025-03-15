@@ -12,16 +12,6 @@ def match_fn(x, y):
         return 0
 
 class Task:
-    NAME = None
-    SUBTASK_LIST = None
-    DATASET = None
-    DATASET_KWARGS = {}
-    PREPROCESSOR = None
-    POSTPROCESSOR = None
-    INFERENCE_FN = None
-    SYSTEM_MESSAGE = None
-    EVALUATION = None
-
 
     def __init__(self,
                  name,
@@ -35,14 +25,15 @@ class Task:
                  system_message: str = None,
                  evaluation: Union[str, Dict[str, Callable]]="match",
                  sampling_args: dict = {},
+                 system_role: str = "system",
                  ):
-        self.name = self.NAME or name
+        self.name = name
         if subtask_list is not None:
             self.subtask_list = [task() for task in subtask_list]
         else:
             self.subtask_list = None
-        self.dataset = self.DATASET or dataset
-        self.dataset_kwargs = self.DATASET_KWARGS or dataset_kwargs
+        self.dataset = dataset
+        self.dataset_kwargs = dataset_kwargs
         if self.dataset is not None:
             self.dataset = self.dataset(**dataset_kwargs)
 
@@ -51,7 +42,7 @@ class Task:
         self.inference_fn = inference_fn
         self.system_message = system_message
 
-        self.evaluation = self.EVALUATION or evaluation
+        self.evaluation = evaluation
         if isinstance(self.evaluation, Callable):
             self.evaluation = {"score": self.evaluation}
         elif isinstance(self.evaluation, str):
@@ -61,13 +52,14 @@ class Task:
                 raise NotImplementedError
 
         self.sampling_args = sampling_args or {}
+        self.system_role = system_role
 
     def __len__(self):
         if self.dataset is None:
             return self.subtask_list[0].__len__()
         return len(self.dataset)
 
-    def infer(self, idx, inference_fn=None, sampling_args=None, system_message=None):
+    async def infer(self, idx, inference_fn=None, sampling_args=None, system_message=None):
         state = {
             "sample_id": idx,
             "current_step": 0,
@@ -81,7 +73,7 @@ class Task:
             self.sampling_args = {**self.sampling_args, **sampling_args}
 
         if self.subtask_list is None:
-            output, _state = self.run_step(idx, state, inference_fn=inference_fn, sampling_args=self.sampling_args)
+            output, _state = await self.run_step(idx, state, inference_fn=inference_fn, sampling_args=self.sampling_args)
             state["step"].append(
                 {"step_id": 0,
                  "task": self.name,
@@ -92,7 +84,7 @@ class Task:
         for _id, task in enumerate(self.subtask_list):
 
             self.sampling_args = {**sampling_args, **task.sampling_args}
-            output, _state = task.run_step(idx,
+            output, _state = await task.run_step(idx,
                                            state=state,
                                            inference_fn=inference_fn,
                                            sampling_args=self.sampling_args,
@@ -108,18 +100,23 @@ class Task:
 
     def preprocess(self, x, state=None):
         if self.preprocessor is not None:
-            return self.preprocessor(x, state)
+            try:
+                return self.preprocessor(x, state)
+            except Exception as e:
+                return self.preprocessor(x), state
         else:
             return x, state
 
     def postprocess(self, x, state=None):
-        if self.postprocessor is not None:
-            return self.postprocessor(x, state)
-        else:
+        try:
+            if self.postprocessor is not None:
+                return self.postprocessor(x, state)
+            else:
+                return x, state
+        except:
             return x, state
 
     def build_message(self, x, state=None):
-        message = [{"role": "user", "content": x}]
 
         if "system_message" in state:
             system_message = state["system_message"]
@@ -129,11 +126,17 @@ class Task:
         if system_message in SYSTEM_MESSAGE:
             system_message = SYSTEM_MESSAGE[system_message]
 
+        message = [{"role": "user", "content": x}]
+        system_role = self.system_role
         if system_message is not None:
-            message.insert(
-                0, 
-                {"role": "system", "content": system_message}
-                )
+            if system_role:
+                message.insert(
+                    0, 
+                    {"role": system_role, "content": system_message}
+                    )
+            else:
+                return [{"role": "user", "content": system_message+"\n\n"+x}]
+
         return message
 
     def extract_answer(self, prediction):
@@ -145,12 +148,12 @@ class Task:
     def eval(self, prediction, ground_truth):
         return {
             eval_name: eval_fn(
-                prediction, 
+                prediction,
                 ground_truth
             ) for eval_name, eval_fn in self.evaluation.items()
         }
 
-    def run_step(self, idx, state=None, inference_fn=None, sampling_args=None):
+    async def run_step(self, idx, state=None, inference_fn=None, sampling_args=None):
         sampling_args = sampling_args or {}
         new_state = {}
         x, y = self.dataset.__getitem__(idx)
@@ -160,9 +163,9 @@ class Task:
         x = self.build_message(x, state)
         new_state["full_input"] = x
         if inference_fn is None:
-            o = self.inference_fn(x, sampling_args)
+            o = await self.inference_fn(x, sampling_args)
         else:
-            o = inference_fn(x, sampling_args)
+            o = await inference_fn(x, sampling_args)
         new_state = {**new_state, **o}
         o, state = self.postprocess(o, state)
         new_state["output"] = o

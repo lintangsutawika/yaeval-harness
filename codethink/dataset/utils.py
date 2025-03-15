@@ -1,5 +1,7 @@
 import re
 
+from math_verify import verify, parse
+
 def extract_fn(answer: str):
     try:
         extracted_answer = answer.split('####')[-1].strip()
@@ -14,6 +16,9 @@ def extract_fn(answer: str):
         return answer
 
 def remove_boxed(s):
+
+    if s is None:
+        return "None"
 
     if s.endswith("$"):
         s = s[:-1]
@@ -74,3 +79,19 @@ def last_boxed_only_string(string):
         retval = string[idx : right_brace_idx + 1]
 
     return retval
+
+def get_boxed_answer(x, state):
+    x = x["response"][0]
+    return remove_boxed(last_boxed_only_string(x)), state
+
+def math_eval(prediction, ground_truth):
+    try:
+        prediction = parse(prediction)
+        ground_truth = parse(ground_truth)
+        return int(verify(ground_truth, prediction))
+    except Exception as e:
+        print(f"Error: {e}")
+        pass
+
+    return 0
+

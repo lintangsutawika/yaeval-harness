@@ -2,7 +2,12 @@ import re
 import ast
 from functools import partial
 
+from codethink.dataset import register_task
+
+from codethink._task import Task, create_task
 from codethink._data import TransformedDataset
+
+from codethink.utils import is_runnable_code
 
 def mathqa_input(x):
     return f"Question:\n{x['Problem']}\n{x['options']}\nAnswer:"
@@ -80,10 +85,20 @@ MathQADataset = partial(
     input_text=mathqa_input,
     output_text=partial(mathqa_output),
     fewshot_output_text=mathqa_fewshot_output,
-    evaluation=mathqa_eval,
     test_split="test",
     fewshot_split="train",
 )
+
+MathQARoutingDataset = partial(
+    TransformedDataset,
+    data_path="allenai/math_qa",
+    input_text=lambda x: x['Problem']+"\n\nWhich method is the best way to solve this problem?", # Answer then write the solution.",
+    output_text=lambda x: "programming language",
+    test_split="test",
+)
+
+
+
 
 # MathQALetterAnswerDataset = partial(
 #     TransformedDataset,
@@ -106,6 +121,82 @@ MathQADataset = partial(
 #     test_split="test",
 #     fewshot_split="train",
 # )
+
+def preprocess_routing(x, state):
+    current_step = state["current_step"]
+    solve_with = state["step"][current_step-1]["output"].split("\n")[0]
+    if solve_with == "programming language":
+        state["system_message"] = "code"
+    elif solve_with == "natural language":
+        state["system_message"] = "cot"
+    return x, state
+
+def postprocess_routing(x, state):
+    x = x["response"][0]
+    current_step = state["current_step"]
+    solve_with = state["step"][current_step-1]["output"]
+    if solve_with == "programming language":
+        x = is_runnable_code(x) 
+    elif solve_with == "natural language":
+        try:
+            x = x.split("answer is")[-1].strip()
+        except:
+            pass
+    return x, state
+
+def postprocess_PL_or_NL(x, state):
+    x = x["response"][0]
+    exec_result = is_runnable_code(x) 
+    if exec_result:
+        return exec_result, state
+    else:
+        try:
+            x = x.split("answer is")[-1].strip()
+        except:
+            pass
+    return x, state
+
+
+@register_task(
+    "mathqa-routing_pipeline_nl_first",
+    subtask_list=[
+        create_task(
+            name="mathqa_routing",
+            dataset=MathQARoutingDataset,
+            system_message="routing_selection_nl_first",
+            sampling_args={"stop": ["\n\n", "\n"]},
+        ),
+        #create_task(
+        #    name="mathqa_solve",
+        #    dataset=MathQADataset,
+        #    preprocessor=preprocess_routing,
+        #    postprocessor=postprocess_routing,
+        #    evaluation={"accuracy": mathqa_eval},
+        #),
+    ])
+class MathQARoutingATask(Task):
+    pass
+
+@register_task(
+    "mathqa-routing_pipeline_pl_first",
+    subtask_list=[
+        create_task(
+            name="mathqa_routing",
+            dataset=MathQARoutingDataset,
+            system_message="routing_selection_pl_first",
+            sampling_args={"stop": ["\n\n", "\n"]},
+        ),
+        #create_task(
+        #    name="mathqa_solve",
+        #    dataset=MathQADataset,
+        #    preprocessor=preprocess_routing,
+        #    postprocessor=postprocess_routing,
+        #    evaluation={"accuracy": mathqa_eval},
+        #),
+    ])
+class MathQARoutingBTask(Task):
+    pass
+
 
 
 if __name__ == "__main__":

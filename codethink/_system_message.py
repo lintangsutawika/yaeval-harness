@@ -1,62 +1,16 @@
 SYSTEM_MESSAGE = {
     "none": "",
+    "code_old": """\
+Solve with the following approach: DIRECTLY and ONLY write a program with the PYTHON programming language. The function must be named solution() without any input arguments. At the end, you MUST return an single value.\
+""",
     "code": """\
-Solve the problem by DIRECTLY and ONLY writing a program. The function must be named solution() without any input arguments.
-At the end, you MUST return an single value.\
+Solve the following problem by DIRECTLY and ONLY writing a PYTHON program. The answer mush be a function named solution() without any input arguments. The function MUST return an single value.\
 """,
-    "code_comment": """\
-Solve the problem by DIRECTLY and ONLY writing a program. The function must be named solution() without any input arguments.
-Explain your reasoning by adding comments in the program.
-At the end, you MUST return an single value.\
+    "cot_old" : """\
+Solve with the following approach: Think step-by-step. Derive and go through the logical steps in order to arrive at the final answer. At the end, you MUST write the answer after 'The answer is'.
 """,
-    "code_python": """\
-Solve the problem by DIRECTLY and ONLY writing a program with the PYTHON programming language. The function must be named solution() without any input arguments.
-At the end, you MUST return an single value.\
-""",
-    "code_comment_python": """\
-Solve the problem by DIRECTLY and ONLY writing a program with the PYTHON programming language. The function must be named solution() without any input arguments.
-Explain your reasoning by adding comments in the program.
-At the end, you MUST return an single value.\
-""",
-    "code_javascript": """\
-Solve the problem by DIRECTLY and ONLY writing a program with the JAVASCRIPT programming language. The function must be named solution() without any input arguments.
-At the end, you MUST return an single value.\
-""",
-    "code_comment_javascript": """\
-Solve the problem by DIRECTLY and ONLY writing a program with the JAVASCRIPT programming language. The function must be named solution() without any input arguments.
-Explain your reasoning by adding comments in the program.
-At the end, you MUST return an single value.\
-""",
-    "code_rust": """\
-Solve the problem by DIRECTLY and ONLY writing a program with the RUST programming language. The function must be named solution() without any input arguments.
-At the end, you MUST return an single value.\
-""",
-    "code_comment_rust": """\
-Solve the problem by DIRECTLY and ONLY writing a program with the RUST programming language. The function must be named solution() without any input arguments.
-Explain your reasoning by adding comments in the program.
-At the end, you MUST return an single value.\
-""",
-    "code_c": """\
-Solve the problem by DIRECTLY and ONLY writing a program with the C programming language. The function must be named solution() without any input arguments.
-At the end, you MUST return an single value.\
-""",
-    "code_comment_c": """\
-Solve the problem by DIRECTLY and ONLY writing a program with the C programming language. The function must be named solution() without any input arguments.
-Explain your reasoning by adding comments in the program.
-At the end, you MUST return an single value.\
-""",
-    "code_cpp": """\
-Solve the problem by DIRECTLY and ONLY writing a program with the C++ programming language. The function must be named solution() without any input arguments.
-At the end, you MUST return an single value.\
-""",
-    "code_comment_cpp": """\
-Solve the problem by DIRECTLY and ONLY writing a program with the C++ programming language. The function must be named solution() without any input arguments.
-Explain your reasoning by adding comments in the program.
-At the end, you MUST return an single value.\
-""",
-    "cot" : """\
-Solve the problem by thinking step-by-step. Go through the reasoning in order to derive the final answer.
-At the end, you MUST write the answer after 'The answer is'."\
+    "cot": """\
+Solve the following problem by thinking step-by-step. Derive and go through the logical steps in order to arrive at the final answer. At the end, you MUST write the answer after 'The answer is'.\
 """,
     "routing_nl_first" : """\
 Choose only one way to solve the problem: by thinking step-by-step OR writing a program as a way to solve a given task. Do NOT use both:
@@ -84,4 +38,10 @@ Based on a given task, choose only one way that can be used to solve the problem
     "routing_selection_pl_first" : """\
 Based on a given task, choose only one way that can be used to solve the problem: by programming language OR natural language to solve a given task. Do NOT use both. Answer with either "programming language" or "natural language".
 """,
+    "math_reason" : "Reason step by step and put your final answer within \\boxed{}.",
+    "eng_reason_in_ind" : "Reason step by step in Indonesian and put your final answer within \\boxed{}.",
+    "ind_reason"        : "Berpikir langkah demi langkah dan tuliskan jawaban akhir di dalam \\boxed{}.",
+"eng_reason_analogy_ind": "Use step-by-step reasoning and analogies to explain how to solve the problem using Indonesian. Put your final answer within \\boxed{}.",
+    "eng_reason_in_jpn" : "Reason step by step in Japanese and put your final answer within \\boxed{}.",
+    "jpn_reason"        : "段階的に理論を展開し、最終的な答えを \\boxed{} の中に入れてください。",
 }

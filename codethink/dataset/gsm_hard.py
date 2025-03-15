@@ -1,7 +1,11 @@
 import re
 from functools import partial
 
+from codethink.dataset import register_task
+from codethink._task import Task
 from codethink._data import TransformedDataset
+
+from codethink.dataset.utils import get_boxed_answer, math_eval
 
 def gsm8k_fewshot_input(x):
     fewshot_context = """\
@@ -62,7 +66,6 @@ GSMHardDataset = partial(
     output_text=gsm8k_output,
     # fewshot_input_text=gsm8k_fewshot_input,
     # fewshot_output_text=gsm8k_fewshot_output,
-    evaluation=gsm8k_eval,
     test_split="train",
     # fewshot_split="train",
 )
@@ -74,10 +77,27 @@ GSMHardGenerateTestsDataset = partial(
     output_text=gsm8k_output,
     # fewshot_input_text=gsm8k_fewshot_input,
     # fewshot_output_text=gsm8k_fewshot_output,
-    evaluation=gsm8k_eval,
     test_split="train",
     # fewshot_split="train",
 )
+
+@register_task(
+    "gsmhard_boxed",
+    dataset=GSMHardDataset,
+    postprocessor=get_boxed_answer,
+    evaluation={"accuracy": math_eval},
+    )
+class GSM8KBoxedTask(Task):
+    pass
+
+@register_task(
+    "gsm_hard",
+    dataset=GSMHardDataset,
+    postprocessor=lambda x,y: (x["response"][0], y),
+    evaluation={"accuracy": gsm8k_eval},
+    )
+class GSMHardTask:
+    pass
 
 if __name__ == "__main__":
 

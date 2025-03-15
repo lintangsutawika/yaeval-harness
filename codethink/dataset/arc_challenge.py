@@ -1,7 +1,11 @@
 import os
 from functools import partial
 
+from codethink.dataset import register_task
+from codethink._task import Task
 from codethink._data import TransformedDataset
+from codethink.dataset.utils import get_boxed_answer, math_eval
+
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -33,9 +37,19 @@ ARCDataset = partial(
     input_text=arc_input,
     output_text=arc_output,
     # fewshot_output_text=arc_fewshot_output,
-    evaluation=arc_eval,
+    # evaluation=arc_eval,
     test_split="test",
 )
+
+@register_task(
+    "arc_challenge_boxed",
+    dataset=ARCDataset,
+    postprocessor=get_boxed_answer,
+    evaluation={"accuracy": math_eval},
+    )
+class ARCChallengeBoxed(Task):
+    pass
+
 
 if __name__ == "__main__":
 

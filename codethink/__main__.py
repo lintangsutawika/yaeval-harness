@@ -1,5 +1,6 @@
 import os
 import sys
+import asyncio
 import logging
 import requests
 import subprocess
@@ -217,6 +218,10 @@ def setup_parser() -> argparse.ArgumentParser:
         default=None,
         type=str,
     )
+    parser.add_argument(
+        "--no_system_role",
+        action="store_true",
+    )
     return parser
 
 def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
@@ -312,6 +317,9 @@ def main():
         datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
 
         # args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
+    aux_task_args = {}
+    if args.no_system_role:
+        aux_task_args["system_role"] = None
 
     evaluator = EvaluateSystem(
         model=args.model,
@@ -359,12 +367,13 @@ def main():
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
 
-        evaluator.run(
-            ALL_TASK_LIST[task](),
+        asyncio.run(
+            evaluator.run(
+            ALL_TASK_LIST[task](**aux_task_args),
             sampling_args=simple_parse_args_string(args.sample_args) if args.sample_args else None,
             run_name=task_run_name,
             n_samples=args.n_samples
-        )
+        ))
 
     if args.serve and (args.keep == False):
         def kill_vllm_serve(process):
