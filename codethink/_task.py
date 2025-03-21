@@ -1,7 +1,12 @@
 import os
+import numpy as np
+
+from dataclasses import dataclass
 from functools import partial
-from typing import Union, Callable, Dict
-from codethink._system_message import SYSTEM_MESSAGE
+from typing import Union, Callable, Dict, List
+from codethink._system_message import Prompt, SYSTEM_MESSAGE
+from codethink.response import POSTPROCESS
+from codethink._data import TransformedDataset
 
 from transformers import AutoTokenizer
 
@@ -11,38 +16,144 @@ def match_fn(x, y):
     except Exception as e:
         return 0
 
+def get_postprocess_fn(postprocess):
+    if postprocess in POSTPROCESS:
+        return POSTPROCESS[postprocess]
+    else:
+        return postprocess
+
+@dataclass
+class TaskConfig:
+    name: str
+    subtask_list: List['TaskConfig'] = None
+    preprocessor: Callable = None
+    postprocessor: Callable = None
+    inference_fn: Callable = None
+    prompt: str = None
+    evaluation: Dict = None
+    sampling_args: Dict = None
+    callback: Callable = None
+    name: str = None,
+    subtask_list: list = None,
+    # dataset = None,
+    # dataset_kwargs: dict = {},
+    preprocessor: callable = lambda x, y: (x, y),
+    postprocessor: callable = lambda x, y: (x, y),
+    inference_fn: callable = None,
+    tokenizer: str = None,
+    system_message: Union[str, Prompt] = None,
+    evaluation: Union[str, Dict[str, Callable]]="match",
+    sampling_args: dict = {},
+    system_role: str = "system",
+    logging: callable = None,
+    sample_agg_fn: callable = np.mean,
+    data_path: str=None,
+    data_name: str=None,
+    input_text: Union[str, Callable]=None,
+    output_text: Union[str, Callable]=None,
+    preprocessing: Callable=None,
+    test_split: str=None,
+    fewshot_input_text: Union[str, Callable]=None,
+    fewshot_output_text: Union[str, Callable]=None,
+    fewshot_split: str=None,
+    num_fewshot: int=0,
+    sampler: str=None,
+    fewshot_delimiter: str="\n\n",
+    answer_delimiter: str="\n",
+    n_samples: Union[int, float]=None,
+    data_kwargs: dict=None,
+    batch_processing: bool=False,
+
+# @dataclass
 class Task:
 
-    def __init__(self,
-                 name,
-                 subtask_list: list = None,
-                 dataset = None,
-                 dataset_kwargs: dict = {},
-                 preprocessor: callable = lambda x, y: (x, y),
-                 postprocessor: callable = lambda x, y: (x['response'][0], y),
-                 inference_fn: callable = None,
-                 tokenizer: str = None,
-                 system_message: str = None,
-                 evaluation: Union[str, Dict[str, Callable]]="match",
-                 sampling_args: dict = {},
-                 system_role: str = "system",
-                 ):
-        self.name = name
-        if subtask_list is not None:
-            self.subtask_list = [task() for task in subtask_list]
+    # def __init__(self,
+    config: TaskConfig = None
+    name: str = None
+    subtask_list: list = None
+    # dataset = None,
+    # dataset_kwargs: dict = {},
+    preprocessor: callable = None
+    postprocessor: callable = None
+    inference_fn: callable = None
+    tokenizer: str = None
+    system_message: Union[str, Prompt] = None
+    evaluation: Union[str, Dict[str, Callable]]="match"
+    sampling_args: dict =None
+    system_role: str = "system"
+    logging: callable = None
+    sample_agg_fn: callable = np.mean
+    data_path: str=None
+    data_name: str=None
+    input_text: Union[str, Callable]=None
+    output_text: Union[str, Callable]=None
+    preprocessing: Callable=None
+    test_split: str=None
+    fewshot_input_text: Union[str, Callable]=None
+    fewshot_output_text: Union[str, Callable]=None
+    fewshot_split: str=None
+    num_fewshot: int=0
+    sampler: str=None
+    fewshot_delimiter: str="\n\n"
+    answer_delimiter: str="\n"
+    n_samples: Union[int, float]=None
+    data_kwargs: dict=None
+    batch_processing: bool=False
+
+    @staticmethod
+    def _input_text(self, x):
+        return self.input_text(x)
+
+
+    def __init__(
+        self,
+        preprocessor: callable = None,
+        postprocessor: callable = None,
+        system_message: Union[str, Prompt] = None,
+        system_role: str = "system",
+        sampling_args: dict =None,
+        num_fewshot: Union[int, float]=None,
+        n_samples: Union[int, float]=None,
+        ):
+        # self.name = name
+        if self.subtask_list is not None:
+            self.subtask_list = [task() for task in self.subtask_list]
+
+        if self.data_path is not None:
+            self.dataset = TransformedDataset(
+                data_path=self.data_path,
+                data_name=self.data_name,
+                input_text=self.input_text.__func__,
+                output_text=self.output_text.__func__,
+                preprocessing=self.preprocessing,
+                test_split=self.test_split,
+                fewshot_input_text=self.fewshot_input_text,
+                fewshot_output_text=self.fewshot_output_text,
+                fewshot_split=self.fewshot_split,
+                num_fewshot=self.num_fewshot,
+                sampler=self.sampler,
+                fewshot_delimiter=self.fewshot_delimiter,
+                answer_delimiter=self.answer_delimiter,
+                n_samples=self.n_samples,
+                data_kwargs=self.data_kwargs,
+                batch_processing=self.batch_processing,
+                )
         else:
-            self.subtask_list = None
-        self.dataset = dataset
-        self.dataset_kwargs = dataset_kwargs
-        if self.dataset is not None:
-            self.dataset = self.dataset(**dataset_kwargs)
+            self.dataset = None
 
-        self.preprocessor = preprocessor
-        self.postprocessor = postprocessor
-        self.inference_fn = inference_fn
-        self.system_message = system_message
-
-        self.evaluation = evaluation
+        self.sample_agg_fn = self.sample_agg_fn.__func__
+        self.logging = self.logging.__func__
+        # self.preprocessor = preprocessor
+        if postprocessor is not None:
+            self.postprocessor = get_postprocess_fn(postprocessor)
+        # self.inference_fn = inference_fn
+        # if isinstance(system_message, Prompt):
+        #     self.system_message = system_message
+        #     self.postprocessor = get_postprocess_fn(postprocessor)
+        # else:
+        #     self.system_message = system_message
+        
+        # self.evaluation = evaluation
         if isinstance(self.evaluation, Callable):
             self.evaluation = {"score": self.evaluation}
         elif isinstance(self.evaluation, str):
@@ -51,52 +162,20 @@ class Task:
             else:
                 raise NotImplementedError
 
-        self.sampling_args = sampling_args or {}
-        self.system_role = system_role
+        if self.sampling_args is None:
+            self.sampling_args = {}
+        # self.sampling_args = sampling_args or {}
+        # self.system_role = system_role
+        # self.logging = logging
+        # self.sample_agg_fn = sample_agg_fn
 
     def __len__(self):
         if self.dataset is None:
             return self.subtask_list[0].__len__()
         return len(self.dataset)
 
-    async def infer(self, idx, inference_fn=None, sampling_args=None, system_message=None):
-        state = {
-            "sample_id": idx,
-            "current_step": 0,
-            "step": []
-            }
-
-        if system_message is not None:
-            self.system_message = system_message
-
-        if sampling_args is not None:
-            self.sampling_args = {**self.sampling_args, **sampling_args}
-
-        if self.subtask_list is None:
-            output, _state = await self.run_step(idx, state, inference_fn=inference_fn, sampling_args=self.sampling_args)
-            state["step"].append(
-                {"step_id": 0,
-                 "task": self.name,
-                 **_state}
-            )
-            return output, state
-
-        for _id, task in enumerate(self.subtask_list):
-
-            self.sampling_args = {**sampling_args, **task.sampling_args}
-            output, _state = await task.run_step(idx,
-                                           state=state,
-                                           inference_fn=inference_fn,
-                                           sampling_args=self.sampling_args,
-                                           )
-            state["step"].append(
-                {"step_id": _id,
-                 "task": task.name,
-                 **_state}
-            )
-            state["current_step"] += 1
-
-        return output, state
+    def terminate(self):
+        return True
 
     def preprocess(self, x, state=None):
         if self.preprocessor is not None:
@@ -108,15 +187,15 @@ class Task:
             return x, state
 
     def postprocess(self, x, state=None):
-        try:
-            if self.postprocessor is not None:
+        if self.postprocessor is not None:
+            try:
                 return self.postprocessor(x, state)
-            else:
-                return x, state
-        except:
+            except Exception as e:
+                return self.postprocessor(x), state
+        else:
             return x, state
 
-    def build_message(self, x, state=None):
+    def build_message(self, x, state=None, system_role="system"):
 
         if "system_message" in state:
             system_message = state["system_message"]
@@ -127,7 +206,6 @@ class Task:
             system_message = SYSTEM_MESSAGE[system_message]
 
         message = [{"role": "user", "content": x}]
-        system_role = self.system_role
         if system_message is not None:
             if system_role:
                 message.insert(
@@ -153,35 +231,18 @@ class Task:
             ) for eval_name, eval_fn in self.evaluation.items()
         }
 
-    async def run_step(self, idx, state=None, inference_fn=None, sampling_args=None):
-        sampling_args = sampling_args or {}
-        new_state = {}
-        x, y = self.dataset.__getitem__(idx)
-        new_state["raw_input"] = x
-        new_state["ground_truth"] = y
-        x, state = self.preprocess(x, state)
-        x = self.build_message(x, state)
-        new_state["full_input"] = x
-        if inference_fn is None:
-            o = await self.inference_fn(x, sampling_args)
-        else:
-            o = await inference_fn(x, sampling_args)
-        new_state = {**new_state, **o}
-        o, state = self.postprocess(o, state)
-        new_state["output"] = o
-        new_state["eval"] = self.eval(o, y)
-        return o, new_state
 
 def create_task(
     name: str = None,
     subtask_list: list = None,
     dataset = None,
     preprocessor: callable = lambda x, y: (x, y),
-    postprocessor: callable = lambda x, y: (x['response'][0], y),
+    postprocessor: callable = lambda x, y: (x, y),
     inference_fn: callable = None,
     system_message: str = None,
     evaluation: Union[str, Dict[str, Callable]]="match",
     sampling_args: dict = {},
+    logging: callable = None,
     ):
     return partial(Task, 
                 name=name,
@@ -193,6 +254,7 @@ def create_task(
                 system_message=system_message,
                 evaluation=evaluation,
                 sampling_args=sampling_args,
+                logging=logging,
                 )
 
 
