@@ -16,7 +16,10 @@ from typing import List, Tuple
 from torch.utils.data import DataLoader
 
 from vllm import SamplingParams
-from codethink.utils import zeno_upload, check_api_health
+from codethink.utils import check_api_health
+from codethink.utils.api_postprocess import vllm_postprocess
+
+from codethink._system_message import Prompt, SYSTEM_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +28,14 @@ class EvaluateSystem:
                  model,
                  api_key="EMPTY",
                  api_base="http://localhost:8000/v1",
+                 api_process=vllm_postprocess,
                  output_path=None,
                  run_args=None,
                  use_run_name=True,
                  verbose=False,
                  sampling_args=None,
                  system_message=None,
+                 system_role="assistant",
                  max_rps=500,
                  **kwargs,
                  ):
@@ -57,7 +62,8 @@ class EvaluateSystem:
             api_key=api_key,
             base_url=api_base,
         )
-
+        self.api_process = api_process
+        self.system_role = "assistant"
         self.system_message = system_message
 
     async def fetch_completion(self, messages, sampling_args=None):
@@ -71,23 +77,13 @@ class EvaluateSystem:
                 messages=messages,
                 **sampling_args,
             )
-            return {
-                "response": [
-                    response.choices[i].message.content
-                    for i in range(0, len(response.choices))
-                ],
-                "input_len": response.usage.prompt_tokens,
-                "output_len": response.usage.completion_tokens,
-            }
+            return self.api_process(response)
+            return response
         except asyncio.CancelledError:
             return None
         except Exception as e:
             print(f"Error fetching chat completion: {e}")
-            return {
-                    "response": [],
-                    "input_len": 0,
-                    "output_len": 0,
-            }
+            return {}
 
     async def run(self, task, sampling_args=None, run_name=None, n_samples=None):
 
@@ -97,12 +93,14 @@ class EvaluateSystem:
         else:
             self.run_name = run_name
 
+        #if system_message is not None:
+        #    self.system_message = system_message
+
+        if sampling_args is not None:
+            self.sampling_args = {**self.sampling_args, **sampling_args}
+
         result_dict = {
             "n_samples": 0,
-            "duration": 0,
-            "total_tokens": 0,
-            "input_tokens": 0,
-            "output_tokens": 0,
         }
         data_dict = {
             "idx": [],
@@ -144,7 +142,7 @@ class EvaluateSystem:
         #        executor.submit(
         #                task.infer,
         #                idx,
-        #                inference_fn=self.fetch_completion,
+        #                fetch_completions=self.fetch_completion,
         #                sampling_args=sampling_args,
         #                system_message=self.system_message,
         #            ) for idx in range(n_samples)
@@ -160,20 +158,17 @@ class EvaluateSystem:
                 #    pass
         all_results = []
         for n_range in n_ranges:
-            all_task = [
-                task.infer(
+            all_requests = [
+                self.infer(
+                    task,
                     idx,
-                    inference_fn=self.fetch_completion,
-                    sampling_args=sampling_args,
-                    system_message=self.system_message
+                    # sampling_args=sampling_args,
+                    # system_message=self.system_message
                     ) for idx in range(*n_range)
             ]
-            chat_completions = await tqdm.gather(*all_task)
+            chat_completions = await tqdm.gather(*all_requests)
             all_results.extend([c for c in chat_completions if c is not None])
-        #print(successful_completions[0])
-        #import sys; sys.exit()
-        # all_results = [x for x in sorted(all_results, key=lambda x: x["sample_id"])]
-
+        
         for ans, steps in tqdm(all_results):
             output_dict = steps["step"][-1]
             inp = output_dict["full_input"]
@@ -192,10 +187,11 @@ class EvaluateSystem:
                 else:
                     result_dict[metric] += score
 
-            # result_dict["duration"] += output_dict["duration"]
-            result_dict["input_tokens"] += output_dict["input_len"]
-            result_dict["output_tokens"] += output_dict["output_len"]
-            result_dict["total_tokens"] += (output_dict["input_len"] + output_dict["output_len"])
+            for key, value in output_dict["log"].items():
+                if key in result_dict:
+                    result_dict[key] += value
+                else:
+                    result_dict[key] = value
             output_json.append(
                 {
                     "idx": idx,
@@ -208,26 +204,14 @@ class EvaluateSystem:
                 }
             )
 
-            # data_dict["idx"].append(int(idx))
-            # data_dict["answer"].append(ans)
-            # data_dict["system_output"].append(output_dict["system_output"])
-            # data_dict["ground_truth"].append(gt)
-            # data_dict["user_input"].append(user_input)
-            # data_dict["score"].append(score)
-            # data_dict["duration"].append(output_dict["duration"])
-            # data_dict["input_tokens"].append(output_dict["input_len"])
-            # data_dict["output_tokens"].append(output_dict["output_len"])
-            # data_dict["total_tokens"].append(output_dict["input_len"] + output_dict["output_len"])
             idx += 1
-        # zeno_upload(self.run_name, data_dict)
 
-        # result_dict = {**self.run_args, **result_dict}
-        for metric, score in score_dict.items():
-            result_dict[f"avg_{metric}"] = result_dict[metric]/result_dict["n_samples"]
-        # result_dict["avg_duration"] = result_dict["duration"]/result_dict["n_samples"]
-        result_dict["avg_input_tokens"] = result_dict["input_tokens"]/result_dict["n_samples"]
-        result_dict["avg_output_tokens"] = result_dict["output_tokens"]/result_dict["n_samples"]
-        result_dict["avg_total_tokens"] = result_dict["total_tokens"]/result_dict["n_samples"]
+        result_keys = list(result_dict.keys())
+        for key in result_keys:
+            if key == "n_samples":
+                continue
+            result_dict[f"avg_{key}"] = result_dict[key]/result_dict["n_samples"]
+        
         logger.warning(f"{self.run_name} complete")
         logger.warning(
             ",".join(
@@ -253,4 +237,115 @@ class EvaluateSystem:
                 print("Error:", e)
 
         return 0
+
+    async def run_step(self, task, idx, state=None, sampling_args=None):
+        sampling_args = sampling_args or {}
+        new_state = {}
+        x, y = task.dataset.__getitem__(idx)
+        new_state["raw_input"] = x
+        new_state["ground_truth"] = y
+        x, state = task.preprocess(x, state)
+        x = self.build_message(x, state)
+        new_state["full_input"] = x
+        o, _state = await self.fetch_completion(x, sampling_args)
+        new_state = {**new_state, **_state}
+        if isinstance(o, list):
+            o = [list(task.postprocess(_o, state))[0] for _o in o]
+            sample_score = [task.eval(_o, y) for _o in o]
+            new_state["eval"] = {}
+            for score in sample_score:
+                for metric_name, metric_score in score.items():
+                    if metric_name in new_state["eval"]:
+                        new_state["eval"][metric_name].append(metric_score)
+                    else:
+                        new_state["eval"][metric_name] = [metric_score]
+            if task.sample_agg_fn:
+                new_state["eval"] = {
+                    k: task.sample_agg_fn(
+                        new_state["eval"][k]
+                        ) for k in new_state["eval"].keys()
+                    }
+        else:
+            o, state = task.postprocess(o, state)
+            new_state["eval"] = self.eval(o, y)
+        new_state["output"] = o
+        if task.logging:
+            new_state["log"] = task.logging(new_state)
+        return o, new_state
+
+    async def infer(self, task, idx, system_message=None):
+        state = {
+            "sample_id": idx,
+            "current_step": 0,
+            "step": []
+            }
+
+        if task.subtask_list is None:
+            # while task.terminate:
+            output, _state = await self.run_step(
+                                            task,
+                                            idx,
+                                            state,
+                                            # sampling_args=self.sampling_args
+                                            )
+            state["step"].append(
+                {"step_id": 0,
+                "task": "test",
+                # "task": self.name,
+                **_state}
+            )
+            return output, state
+
+        for _id, task in enumerate(task.subtask_list):
+
+            # while task.terminate:
+            self.sampling_args = {**sampling_args, **task.sampling_args}
+            output, _state = await self.run_step(
+                                            task,
+                                            idx,
+                                            state=state,
+                                            # sampling_args=self.sampling_args,
+                                            )
+            state["step"].append(
+                {"step_id": _id,
+                 "task": task.name,
+                 **_state}
+            )
+            state["current_step"] += 1
+
+        return output, state
+
+    def build_message(self, x, state=None):
+
+        if "system_message" in state:
+            system_message = state["system_message"]
+        else:
+            system_message = self.system_message
+
+        if system_message in SYSTEM_MESSAGE:
+            system_message = SYSTEM_MESSAGE[system_message]
+
+        message = [{"role": "user", "content": x}]
+        system_role = self.system_role
+        if system_message is not None:
+            if system_role:
+                message.insert(
+                    0, 
+                    {"role": system_role, "content": system_message}
+                    )
+            else:
+                return [{"role": "user", "content": system_message+"\n\n"+x}]
+
+        return message
+
+
+
+
+
+
+
+
+
+
+
 
