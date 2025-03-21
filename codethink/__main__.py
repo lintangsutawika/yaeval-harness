@@ -16,7 +16,8 @@ import importlib.util
 
 from codethink.utils import simple_parse_args_string
 # from codethink import INTERFACE, SYSTEM_MESSAGE
-from codethink.dataset import TASK_LIST
+from codethink.task import TASK_LIST
+from codethink.response import POSTPROCESS
 from codethink.evaluation import EvaluateSystem
 
 logger = logging.getLogger(__name__)
@@ -147,6 +148,12 @@ def setup_parser() -> argparse.ArgumentParser:
         default=None,
         type=str,
         help="Task to evaluate model on",
+    )
+    parser.add_argument(
+        "--post",
+        default=None,
+        type=str,
+        help="Post Process",
     )
     parser.add_argument(
         "--rescore",
@@ -321,6 +328,9 @@ def main():
     if args.no_system_role:
         aux_task_args["system_role"] = None
 
+    if args.post and (args.post in POSTPROCESS):
+        aux_task_args["postprocessor"] = POSTPROCESS[args.post]
+
     evaluator = EvaluateSystem(
         model=args.model,
         api_key=api_key,
@@ -366,10 +376,10 @@ def main():
             else:
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
-
+        
         asyncio.run(
             evaluator.run(
-            ALL_TASK_LIST[task](**aux_task_args),
+            ALL_TASK_LIST[task](name=task, **aux_task_args),
             sampling_args=simple_parse_args_string(args.sample_args) if args.sample_args else None,
             run_name=task_run_name,
             n_samples=args.n_samples
@@ -384,5 +394,5 @@ def main():
         kill_vllm_serve(vllm_server)
 
 if __name__ == "__main__":
-
+    # fire.Fire(main)
     main()

@@ -107,6 +107,7 @@ class Task:
 
     def __init__(
         self,
+        name: str = None,
         preprocessor: callable = None,
         postprocessor: callable = None,
         system_message: Union[str, Prompt] = None,
@@ -141,6 +142,8 @@ class Task:
         else:
             self.dataset = None
 
+        if name is None:
+            self.name = self.__name__
         self.sample_agg_fn = self.sample_agg_fn.__func__
         self.logging = self.logging.__func__
         # self.preprocessor = preprocessor
