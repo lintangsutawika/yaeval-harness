@@ -187,7 +187,7 @@ if __name__ == "__main__":
         answer = re.sub("####", "So the answer is", answer)
         return answer
 
-    gsm8k_dataset = TransformedDataset(
+    gsm8k_dataset = YevalDataset(
         data_path="gsm8k",
         data_name="main",
         input_text="question",
