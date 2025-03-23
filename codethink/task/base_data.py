@@ -6,10 +6,7 @@ from torch.utils.data import Dataset
 
 from datasets import load_dataset
 
-from .utils import extract_fn
-
-
-class TransformedDataset(Dataset):
+class YevalDataset(Dataset):
     def __init__(self,
                  data_path: str,
                  data_name: str=None,
@@ -17,7 +14,6 @@ class TransformedDataset(Dataset):
                  input_text: Union[str, Callable]=None,
                  output_text: Union[str, Callable]=None,
                  preprocessing: Callable=None,
-                 postprocessing: Callable=extract_fn,
                  test_split: str=None,
                  fewshot_input_text: Union[str, Callable]=None,
                  fewshot_output_text: Union[str, Callable]=None,
@@ -68,8 +64,6 @@ class TransformedDataset(Dataset):
         if preprocessing is not None:
             self.dataset = preprocessing(self.dataset)
 
-        self.postprocessing = postprocessing
-
         self.use_fewshot_input = False
         if fewshot_input_text is not None:
             self.use_fewshot_input = True
@@ -85,7 +79,10 @@ class TransformedDataset(Dataset):
                 except Exception as e:
                     raise e
             elif callable(fn):
-                example[feature] = fn(example, **kwargs)
+                try:
+                    example[feature] = fn(example, **kwargs)
+                except:
+                    example[feature] = fn(example)
             return example
 
         def prepend_fewshot(example, fewshot_samples):
@@ -147,7 +144,8 @@ class TransformedDataset(Dataset):
                 raise NotImplemented
 
             fewshot_samples = self.get_fewshot(sample_idx)
-            self.dataset[test_split] = self.dataset[test_split].map(partial(_transform, fn=prepend_fewshot, feature="__input__", fewshot_samples=fewshot_samples))
+            self.dataset[test_split] = self.dataset[test_split].map(
+                    partial(_transform, fn=prepend_fewshot, feature="__input__", fewshot_samples=fewshot_samples))
 
     def get_fewshot(self, sample_idx):
         fewshot_samples = []
@@ -170,7 +168,7 @@ class TransformedDataset(Dataset):
     def __getitem__(self, i):
         return (
             str(self.dataset[self.test_split][i]["__input__"]),
-            str(self.dataset[self.test_split][i]["__output__"])
+            self.dataset[self.test_split][i]["__output__"]
         )
 
 

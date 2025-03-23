@@ -6,7 +6,6 @@ from functools import partial
 from typing import Union, Callable, Dict, List
 from codethink._system_message import Prompt, SYSTEM_MESSAGE
 from codethink.response import POSTPROCESS
-from codethink._data import TransformedDataset
 
 from transformers import AutoTokenizer
 
@@ -65,10 +64,8 @@ class TaskConfig:
     batch_processing: bool=False,
 
 # @dataclass
-class Task:
+class YevalTask:
 
-    # def __init__(self,
-    config: TaskConfig = None
     name: str = None
     subtask_list: list = None
     # dataset = None,
@@ -121,7 +118,8 @@ class Task:
             self.subtask_list = [task() for task in self.subtask_list]
 
         if self.data_path is not None:
-            self.dataset = TransformedDataset(
+            from codethink.task import YevalDataset
+            self.dataset = YevalDataset(
                 data_path=self.data_path,
                 data_name=self.data_name,
                 input_text=self.input_text.__func__,
