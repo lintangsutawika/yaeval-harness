@@ -112,9 +112,9 @@ class Task:
         postprocessor: callable = None,
         system_message: Union[str, Prompt] = None,
         system_role: str = "system",
-        sampling_args: dict =None,
-        num_fewshot: Union[int, float]=None,
-        n_samples: Union[int, float]=None,
+        sampling_args: dict = None,
+        num_fewshot: Union[int, float] = None,
+        n_samples: Union[int, float] = None,
         ):
 
         if self.subtask_list is not None:
@@ -155,6 +155,11 @@ class Task:
         self.postprocessor = get_postprocess_fn(postprocessor) if postprocessor else self.postprocessor
         self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
 
+        self.system_role = system_role or self.system_role
+        self.n_samples = n_samples or self.n_samples
+        self.num_fewshot = num_fewshot or self.num_fewshot
+        self.sampling_args = sampling_args or self.sampling_args
+        
         # self.inference_fn = inference_fn
         # if isinstance(system_message, Prompt):
         #     self.system_message = system_message
