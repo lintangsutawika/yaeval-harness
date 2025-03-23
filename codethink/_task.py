@@ -116,7 +116,7 @@ class Task:
         num_fewshot: Union[int, float]=None,
         n_samples: Union[int, float]=None,
         ):
-        # self.name = name
+
         if self.subtask_list is not None:
             self.subtask_list = [task() for task in self.subtask_list]
 
@@ -128,8 +128,8 @@ class Task:
                 output_text=self.output_text.__func__,
                 preprocessing=self.preprocessing,
                 test_split=self.test_split,
-                fewshot_input_text=self.fewshot_input_text,
-                fewshot_output_text=self.fewshot_output_text,
+                fewshot_input_text=self.fewshot_input_text.__func__ if self.fewshot_input_text else None,
+                fewshot_output_text=self.fewshot_output_text.__func__ if self.fewshot_output_text else None,
                 fewshot_split=self.fewshot_split,
                 num_fewshot=self.num_fewshot,
                 sampler=self.sampler,
@@ -142,13 +142,19 @@ class Task:
         else:
             self.dataset = None
 
-        if name is None:
-            self.name = self.__name__
-        self.sample_agg_fn = self.sample_agg_fn.__func__
-        self.logging = self.logging.__func__
-        # self.preprocessor = preprocessor
-        if postprocessor is not None:
-            self.postprocessor = get_postprocess_fn(postprocessor)
+        if name is not None:
+            self.name = name 
+        #     self.name = self.__name__
+
+        self.sample_agg_fn = getattr(self.sample_agg_fn, '__func__', self.sample_agg_fn)
+        self.logging = getattr(self.logging, '__func__', self.logging)
+
+        # self.preprocessor = get_preprocess_fn(preprocessor) if preprocessor else self.preprocessor
+        self.preprocessor = getattr(self.preprocessor, '__func__', self.preprocessor)
+
+        self.postprocessor = get_postprocess_fn(postprocessor) if postprocessor else self.postprocessor
+        self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
+
         # self.inference_fn = inference_fn
         # if isinstance(system_message, Prompt):
         #     self.system_message = system_message
@@ -156,7 +162,6 @@ class Task:
         # else:
         #     self.system_message = system_message
         
-        # self.evaluation = evaluation
         if isinstance(self.evaluation, Callable):
             self.evaluation = {"score": self.evaluation}
         elif isinstance(self.evaluation, str):
@@ -169,8 +174,6 @@ class Task:
             self.sampling_args = {}
         # self.sampling_args = sampling_args or {}
         # self.system_role = system_role
-        # self.logging = logging
-        # self.sample_agg_fn = sample_agg_fn
 
     def __len__(self):
         if self.dataset is None:
