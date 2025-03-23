@@ -16,10 +16,11 @@ from typing import List, Tuple
 from torch.utils.data import DataLoader
 
 from vllm import SamplingParams
+
+from codethink.prompt import get_prompt
+from codethink.response import get_postprocess_fn
 from codethink.utils import check_api_health
 from codethink.utils.api_postprocess import vllm_postprocess
-
-from codethink._system_message import Prompt, SYSTEM_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class EvaluateSystem:
                  verbose=False,
                  sampling_args=None,
                  system_message=None,
+                 postprocessor=None,
                  system_role="assistant",
                  max_rps=500,
                  **kwargs,
@@ -64,7 +66,10 @@ class EvaluateSystem:
         )
         self.api_process = api_process
         self.system_role = "assistant"
-        self.system_message = system_message
+        self.system_message, self.postprocessor = get_prompt(system_message)
+        # postprocessor can be overwritten by the system_message
+        self.postprocessor = get_postprocess_fn(postprocessor or self.postprocessor)
+        self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
 
     async def fetch_completion(self, messages, sampling_args=None):
         if sampling_args is not None:
@@ -102,18 +107,7 @@ class EvaluateSystem:
         result_dict = {
             "n_samples": 0,
         }
-        data_dict = {
-            "idx": [],
-            "answer": [],
-            "system_output": [],
-            "ground_truth": [],
-            "user_input": [],
-            "score": [],
-            "duration": [],
-            "input_tokens": [],
-            "output_tokens": [],
-            "total_tokens": [],
-        }
+
         output_json = []
         idx = 0
 
@@ -245,12 +239,15 @@ class EvaluateSystem:
         new_state["raw_input"] = x
         new_state["ground_truth"] = y
         x, state = task.preprocess(x, state)
-        x = self.build_message(x, state)
+        if self.system_message is not None:
+            x = task.build_message(x, state, system_message=self.system_message)
+        else:
+            x = task.build_message(x, state)
         new_state["full_input"] = x
-        o, _state = await self.fetch_completion(x, sampling_args)
+        o, _state = await self.fetch_completion(x, self.sampling_args)
         new_state = {**new_state, **_state}
         if isinstance(o, list):
-            o = [list(task.postprocess(_o, state))[0] for _o in o]
+            o = [list(task.postprocess(_o, state, fn=self.postprocessor))[0] for _o in o]
             sample_score = [task.eval(_o, y) for _o in o]
             new_state["eval"] = {}
             for score in sample_score:
@@ -266,7 +263,7 @@ class EvaluateSystem:
                         ) for k in new_state["eval"].keys()
                     }
         else:
-            o, state = task.postprocess(o, state)
+            o, state = task.postprocess(o, state, fn=self.postprocessor)
             new_state["eval"] = self.eval(o, y)
         new_state["output"] = o
         if task.logging:
@@ -290,8 +287,7 @@ class EvaluateSystem:
                                             )
             state["step"].append(
                 {"step_id": 0,
-                "task": "test",
-                # "task": self.name,
+                "task": task.name,
                 **_state}
             )
             return output, state
@@ -299,7 +295,7 @@ class EvaluateSystem:
         for _id, task in enumerate(task.subtask_list):
 
             # while task.terminate:
-            self.sampling_args = {**sampling_args, **task.sampling_args}
+            # self.sampling_args = {**sampling_args, **task.sampling_args}
             output, _state = await self.run_step(
                                             task,
                                             idx,
