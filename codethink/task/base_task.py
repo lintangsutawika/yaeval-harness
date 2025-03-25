@@ -4,8 +4,8 @@ import numpy as np
 from dataclasses import dataclass
 from functools import partial
 from typing import Union, Callable, Dict, List
-from codethink._system_message import Prompt, SYSTEM_MESSAGE
-from codethink.response import POSTPROCESS
+from codethink.prompt import YevalPrompt, get_message_str, get_prompt
+from codethink.response import get_postprocess_fn
 
 from transformers import AutoTokenizer
 
@@ -15,66 +15,17 @@ def match_fn(x, y):
     except Exception as e:
         return 0
 
-def get_postprocess_fn(postprocess):
-    if postprocess in POSTPROCESS:
-        return POSTPROCESS[postprocess]
-    else:
-        return postprocess
-
-@dataclass
-class TaskConfig:
-    name: str
-    subtask_list: List['TaskConfig'] = None
-    preprocessor: Callable = None
-    postprocessor: Callable = None
-    inference_fn: Callable = None
-    prompt: str = None
-    evaluation: Dict = None
-    sampling_args: Dict = None
-    callback: Callable = None
-    name: str = None,
-    subtask_list: list = None,
-    # dataset = None,
-    # dataset_kwargs: dict = {},
-    preprocessor: callable = lambda x, y: (x, y),
-    postprocessor: callable = lambda x, y: (x, y),
-    inference_fn: callable = None,
-    tokenizer: str = None,
-    system_message: Union[str, Prompt] = None,
-    evaluation: Union[str, Dict[str, Callable]]="match",
-    sampling_args: dict = {},
-    system_role: str = "system",
-    logging: callable = None,
-    sample_agg_fn: callable = np.mean,
-    data_path: str=None,
-    data_name: str=None,
-    input_text: Union[str, Callable]=None,
-    output_text: Union[str, Callable]=None,
-    preprocessing: Callable=None,
-    test_split: str=None,
-    fewshot_input_text: Union[str, Callable]=None,
-    fewshot_output_text: Union[str, Callable]=None,
-    fewshot_split: str=None,
-    num_fewshot: int=0,
-    sampler: str=None,
-    fewshot_delimiter: str="\n\n",
-    answer_delimiter: str="\n",
-    n_samples: Union[int, float]=None,
-    data_kwargs: dict=None,
-    batch_processing: bool=False,
-
-# @dataclass
 class YevalTask:
 
     name: str = None
     subtask_list: list = None
     # dataset = None,
     # dataset_kwargs: dict = {},
-    preprocessor: callable = None
-    postprocessor: callable = None
+    preprocessor: Union[str, Callable] = None
+    postprocessor: Union[str, Callable] = None
     inference_fn: callable = None
     tokenizer: str = None
-    system_message: Union[str, Prompt] = None
+    system_message: Union[str, YevalPrompt] = None
     evaluation: Union[str, Dict[str, Callable]]="match"
     sampling_args: dict =None
     system_role: str = "system"
@@ -105,9 +56,9 @@ class YevalTask:
     def __init__(
         self,
         name: str = None,
-        preprocessor: callable = None,
-        postprocessor: callable = None,
-        system_message: Union[str, Prompt] = None,
+        preprocessor: Union[str, callable] = None,
+        postprocessor: Union[str, callable] = None,
+        system_message: Union[str, YevalPrompt] = None,
         system_role: str = "system",
         sampling_args: dict = None,
         num_fewshot: Union[int, float] = None,
@@ -147,24 +98,23 @@ class YevalTask:
         self.sample_agg_fn = getattr(self.sample_agg_fn, '__func__', self.sample_agg_fn)
         self.logging = getattr(self.logging, '__func__', self.logging)
 
-        # self.preprocessor = get_preprocess_fn(preprocessor) if preprocessor else self.preprocessor
-        self.preprocessor = getattr(self.preprocessor, '__func__', self.preprocessor)
-
-        self.postprocessor = get_postprocess_fn(postprocessor) if postprocessor else self.postprocessor
-        self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
-
         self.system_role = system_role or self.system_role
         self.n_samples = n_samples or self.n_samples
         self.num_fewshot = num_fewshot or self.num_fewshot
         self.sampling_args = sampling_args or self.sampling_args
         
-        # self.inference_fn = inference_fn
-        # if isinstance(system_message, Prompt):
-        #     self.system_message = system_message
-        #     self.postprocessor = get_postprocess_fn(postprocessor)
-        # else:
-        #     self.system_message = system_message
-        
+        if self.system_message is not None:
+            self.system_message, _postprocessor = get_prompt(self.system_message)
+        elif system_message is not None:
+            self.system_message, _postprocessor = get_prompt(system_message)
+
+        if _postprocessor is None:
+            # postprocessor can be overwritten by the system_message
+            self.postprocessor = get_postprocess_fn(postprocessor or self.postprocessor)
+            self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
+        else:
+            self.postprocessor = _postprocessor
+
         if isinstance(self.evaluation, Callable):
             self.evaluation = {"score": self.evaluation}
         elif isinstance(self.evaluation, str):
@@ -195,31 +145,33 @@ class YevalTask:
         else:
             return x, state
 
-    def postprocess(self, x, state=None):
-        if self.postprocessor is not None:
+    def postprocess(self, x, state=None, fn=None):
+        fn = fn or self.postprocessor
+        if fn is not None:
             try:
-                return self.postprocessor(x, state)
+                return fn(x, state)
             except Exception as e:
-                return self.postprocessor(x), state
+                return fn(x), state
         else:
             return x, state
 
-    def build_message(self, x, state=None, system_role="system"):
+    def build_message(self, x, state=None, system_message=None):
 
-        if "system_message" in state:
+        if system_message is not None:
+            system_message = system_message
+        elif "system_message" in state:
             system_message = state["system_message"]
         else:
             system_message = self.system_message
 
-        if system_message in SYSTEM_MESSAGE:
-            system_message = SYSTEM_MESSAGE[system_message]
+        system_message = get_message_str(system_message)
 
         message = [{"role": "user", "content": x}]
         if system_message is not None:
-            if system_role:
+            if self.system_role:
                 message.insert(
                     0, 
-                    {"role": system_role, "content": system_message}
+                    {"role": self.system_role, "content": system_message}
                     )
             else:
                 return [{"role": "user", "content": system_message+"\n\n"+x}]
