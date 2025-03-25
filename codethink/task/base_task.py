@@ -103,6 +103,7 @@ class YevalTask:
         self.num_fewshot = num_fewshot or self.num_fewshot
         self.sampling_args = sampling_args or self.sampling_args
         
+        _postprocessor = None
         if self.system_message is not None:
             self.system_message, _postprocessor = get_prompt(self.system_message)
         elif system_message is not None:
