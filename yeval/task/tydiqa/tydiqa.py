@@ -1,11 +1,11 @@
 import os
 
 from functools import partial
-from codethink.task import register_task, YevalTask
-from codethink.prompt import YevalPrompt, register_prompt
+from yeval.task import register_task, YevalTask
+from yeval.prompt import YevalPrompt, register_prompt
 
-from codethink.logging.usage import log_token_usage
-from codethink.response import (
+from yeval.logging.usage import log_token_usage
+from yeval.response import (
     match_routing,
     preprocess_routing,
     postprocess_routing
@@ -49,7 +49,7 @@ def tydiqa_output(x):
             return x['document_plaintext'][start:end]
     return "None"
 
-from codethink.response import get_boxed_answer
+from yeval.response import get_boxed_answer
 
 @register_prompt("tydiqa_ind_01")
 class IndonesianQA(YevalPrompt):

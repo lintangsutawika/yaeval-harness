@@ -4,8 +4,8 @@ import numpy as np
 from dataclasses import dataclass
 from functools import partial
 from typing import Union, Callable, Dict, List
-from codethink.prompt import YevalPrompt, get_message_str, get_prompt
-from codethink.response import get_postprocess_fn
+from yeval.prompt import YevalPrompt, get_message_str, get_prompt
+from yeval.response import get_postprocess_fn
 
 from transformers import AutoTokenizer
 
@@ -69,7 +69,7 @@ class YevalTask:
             self.subtask_list = [task() for task in self.subtask_list]
 
         if self.data_path is not None:
-            from codethink.task import YevalDataset
+            from yeval.task import YevalDataset
             self.dataset = YevalDataset(
                 data_path=self.data_path,
                 data_name=self.data_name,
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     from openai import OpenAI
     from tqdm import tqdm
     from functools import partial
-    from codethink.dataset.gsm8k import GSM8KDataset, GSM8KRoutingDataset
+    from yeval.dataset.gsm8k import GSM8KDataset, GSM8KRoutingDataset
 
     def preprocess_PL_or_NL(x, state):
         current_step = state["current_step"]

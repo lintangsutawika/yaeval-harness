@@ -17,10 +17,10 @@ from torch.utils.data import DataLoader
 
 from vllm import SamplingParams
 
-from codethink.prompt import get_prompt
-from codethink.response import get_postprocess_fn
-from codethink.utils import check_api_health
-from codethink.utils.api_postprocess import vllm_postprocess
+from yeval.prompt import get_prompt
+from yeval.response import get_postprocess_fn
+from yeval.utils import check_api_health
+from yeval.utils.api_postprocess import vllm_postprocess
 
 logger = logging.getLogger(__name__)
 

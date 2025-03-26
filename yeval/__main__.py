@@ -13,12 +13,12 @@ logging.basicConfig(
 import argparse
 import importlib.util
 
-from codethink.utils import simple_parse_args_string
+from yeval.utils import simple_parse_args_string
 
-from codethink.task import TASK_LIST
-from codethink.prompt import PROMPT_LIST
-from codethink.response import POSTPROCESS
-from codethink.evaluation import EvaluateSystem
+from yeval.task import TASK_LIST
+from yeval.prompt import PROMPT_LIST
+from yeval.response import POSTPROCESS
+from yeval.evaluation import EvaluateSystem
 
 logger = logging.getLogger(__name__)
 
@@ -64,12 +64,6 @@ def setup_parser() -> argparse.ArgumentParser:
         default=0,
         type=int,
         help="Number of fewshot examples",
-    )
-    parser.add_argument(
-        "--repeat",
-        default=1,
-        type=int,
-        help="Number of repeats",
     )
     parser.add_argument(
         "--seed",
@@ -126,6 +120,12 @@ def setup_parser() -> argparse.ArgumentParser:
         "--keep",
         action="store_true",
         help="Keep the server running",
+    )
+    parser.add_argument(
+        "--n_samples",
+        default=-1,
+        type=int,
+        help="Number of samples to evaluate",
     )
     parser.add_argument(
         "--include_path",
@@ -198,7 +198,7 @@ def main():
         import time
         import requests
         import subprocess
-        from codethink.utils import check_api_health
+        from yeval.utils import check_api_health
 
         def launch_vllm_serve():
             # Construct the command to start the vLLM server
@@ -258,7 +258,7 @@ def main():
         )
 
     if args.include_path is not None:
-        from codethink.dataset import import_modules
+        from yeval.dataset import import_modules
         logger.warning(f"Importing modules from {args.include_path}")
         import_modules(args.include_path)
         # ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)

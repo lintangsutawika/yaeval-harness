@@ -1,4 +1,4 @@
-from codethink.prompt import YevalPrompt, register_prompt
+from yeval.prompt import YevalPrompt, register_prompt
 
 @register_prompt("code")
 class CodePrompt(YevalPrompt):

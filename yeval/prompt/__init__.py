@@ -4,7 +4,7 @@ import importlib
 from functools import partial
 
 from .base_prompt import YevalPrompt
-from codethink.response import get_postprocess_fn
+from yeval.response import get_postprocess_fn
 
 PROMPT_LIST = {}
 

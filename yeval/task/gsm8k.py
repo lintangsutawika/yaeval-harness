@@ -1,16 +1,16 @@
 import re
 from functools import partial
 
-from codethink.task import register_task, YevalTask
+from yeval.task import register_task, YevalTask
 
-from codethink.logging.usage import log_token_usage
-from codethink.response import (
+from yeval.logging.usage import log_token_usage
+from yeval.response import (
     match_routing,
     preprocess_routing,
     postprocess_routing
     )
 
-from codethink.metrics import math_eval
+from yeval.metrics import math_eval
 
 def gsm8k_fewshot_input(x):
     fewshot_context = """\
