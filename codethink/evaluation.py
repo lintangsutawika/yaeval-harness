@@ -181,18 +181,19 @@ class EvaluateSystem:
                 else:
                     result_dict[metric] += score
 
-            for key, value in output_dict["log"].items():
-                if key in result_dict:
-                    result_dict[key] += value
-                else:
-                    result_dict[key] = value
+            if "log" in output_dict:
+                for key, value in output_dict["log"].items():
+                    if key in result_dict:
+                        result_dict[key] += value
+                    else:
+                        result_dict[key] = value
             output_json.append(
                 {
                     "idx": idx,
                     **score_dict,
                     "ground_truth": gt,
                     "answer": ans,
-                    "user_input": inp,
+                    # "user_input": inp,
                     **output_dict,
                     **steps,
                 }
@@ -268,6 +269,7 @@ class EvaluateSystem:
         new_state["output"] = o
         if task.logging:
             new_state["log"] = task.logging(new_state)
+            # new_state["log"] = {}
         return o, new_state
 
     async def infer(self, task, idx, system_message=None):
@@ -293,7 +295,6 @@ class EvaluateSystem:
             return output, state
 
         for _id, task in enumerate(task.subtask_list):
-
             # while task.terminate:
             # self.sampling_args = {**sampling_args, **task.sampling_args}
             output, _state = await self.run_step(

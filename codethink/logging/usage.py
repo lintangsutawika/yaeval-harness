@@ -1,6 +1,4 @@
 
-
-
 def log_token_usage(state):
     input_tokens = state["usage"]["prompt_tokens"]
     output_tokens = state["usage"]["completion_tokens"]

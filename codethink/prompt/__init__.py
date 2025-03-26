@@ -9,6 +9,9 @@ from codethink.response import get_postprocess_fn
 PROMPT_LIST = {}
 
 def get_message_str(system_message):
+    if system_message is None:
+        return None
+
     if system_message in PROMPT_LIST:
         system_message = PROMPT_LIST[system_message]
 
