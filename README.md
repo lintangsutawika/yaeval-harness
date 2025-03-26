@@ -1,6 +1,4 @@
-# Yeval
-
-Yet Another Evaluation Library!
+# Yet Another Evaluation Harness
 
 # Usage
 
