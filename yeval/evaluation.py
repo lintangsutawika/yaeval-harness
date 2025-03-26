@@ -246,15 +246,14 @@ class EvaluateSystem:
         else:
             x = task.build_message(x, state)
         new_state["full_input"] = x
-        o, _state = await self.fetch_completion(x, self.sampling_args)
-
+        o, _state = await self.fetch_completion(x, task.sampling_args)
         new_state["completion"] = o
         if task.logging:
             new_state["log"] = task.logging(_state)
             # new_state["log"] = {}
         # new_state = {**new_state, **_state}
         if isinstance(o, list):
-            o = [list(task.postprocess(_o, state, fn=self.postprocessor))[0] for _o in o]
+            o = [task.postprocess(_o, new_state, fn=self.postprocessor) for _o in o]
             sample_score = [task.eval(_o, y) for _o in o]
             new_state["eval"] = {}
             for score in sample_score:
@@ -270,7 +269,7 @@ class EvaluateSystem:
                         ) for k in new_state["eval"].keys()
                     }
         else:
-            o, state = task.postprocess(o, state, fn=self.postprocessor)
+            o, state = task.postprocess(o, new_state, fn=self.postprocessor)
             new_state["eval"] = self.eval(o, y)
         new_state["output"] = o
 

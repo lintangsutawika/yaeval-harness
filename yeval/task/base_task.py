@@ -106,6 +106,10 @@ class YevalTask:
         self.num_fewshot = num_fewshot or self.num_fewshot
         self.sampling_args = sampling_args or self.sampling_args
         
+        if preprocessor is not None:
+            self.preprocessor = preprocessor
+        self.preprocessor = getattr(self.preprocessor, '__func__', self.preprocessor)
+
         _postprocessor = None
         if self.system_message is not None:
             self.system_message, _postprocessor = get_prompt(self.system_message)
@@ -140,12 +144,13 @@ class YevalTask:
     def terminate(self):
         return True
 
-    def preprocess(self, x, state=None):
-        if self.preprocessor is not None:
+    def preprocess(self, x, state=None, fn=None):
+        fn = fn or self.preprocessor
+        if fn is not None:
             try:
-                return self.preprocessor(x, state)
+                return fn(x, state)
             except Exception as e:
-                return self.preprocessor(x), state
+                return fn(x), state
         else:
             return x, state
 
