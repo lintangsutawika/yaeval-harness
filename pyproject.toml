@@ -3,7 +3,7 @@ requires = ["setuptools>=40.8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "codethink"
+name = "yeval"
 version = "0.0.1"
 authors = [
     {name="Lintang Sutawika", email="lsutawik@andrew.cmu.edu"}
@@ -28,14 +28,14 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["codethink*"]
+include = ["yeval*"]
 
 # required to include yaml files in pip installation
 [tool.setuptools.package-data]
-lm_eval = ["**/*.yaml", "tasks/**/*"]
+yeval = ["**/*.yaml", "tasks/**/*"]
 
 [project.scripts]
-codethink = "codethink.__main__:main"
+yeval = "yeval.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/lintangsutawika/chain-of-code-thinking"
@@ -48,7 +48,7 @@ extend-select = ["I"]
 
 [tool.ruff.lint.isort]
 lines-after-imports = 2
-known-first-party = ["codethink"]
+known-first-party = ["yeval"]
 
 [tool.ruff.lint.extend-per-file-ignores]
 # "__init__.py" = ["F401","F402","F403"]
