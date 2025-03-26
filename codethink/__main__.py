@@ -13,10 +13,10 @@ logging.basicConfig(
 import argparse
 import importlib.util
 
-
 from codethink.utils import simple_parse_args_string
-# from codethink import INTERFACE, SYSTEM_MESSAGE
+
 from codethink.task import TASK_LIST
+from codethink.prompt import PROMPT_LIST
 from codethink.response import POSTPROCESS
 from codethink.evaluation import EvaluateSystem
 
@@ -50,18 +50,6 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Path to output file",
     )
     parser.add_argument(
-        "--get_answer_expr",
-        type=str,
-        default="solution()",
-        help="Name of function to execute",
-    )
-    parser.add_argument(
-        "--get_answer_symbol",
-        type=str,
-        default=None,
-        help="Postprocessing answer",
-    )
-    parser.add_argument(
         "--serve", "-s",
         action="store_true",
         help="Serve model while also running evaluation",
@@ -70,42 +58,6 @@ def setup_parser() -> argparse.ArgumentParser:
         "--verbose", "-v",
         action="store_true",
         help="Sets verbose",
-    )
-    parser.add_argument(
-        "--revision", "-r",
-        type=str,
-        default="main",
-        help="Set specific model version",
-    )
-    parser.add_argument(
-        "--model_kwargs", "-a",
-        default="",
-        type=str,
-        help="Comma separated string arguments for `from_pretrained`",
-    )
-    parser.add_argument(
-        "--device",
-        default=None,
-        type=str,
-        help="Set model in a particular device",
-    )
-    parser.add_argument(
-        "--device_map",
-        default="auto",
-        type=str,
-        help="Map model to device",
-    )
-    parser.add_argument(
-        "--temperature",
-        default=0.0,
-        type=float,
-        help="temperature",
-    )
-    parser.add_argument(
-        "--top_p",
-        default=1.0,
-        type=float,
-        help="top_p",
     )
     parser.add_argument(
         "--num_fewshot",
@@ -126,24 +78,6 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Number of seed",
     )
     parser.add_argument(
-        "--max_model_len",
-        default=4096,
-        type=int,
-        help="Max model lengths",
-    )
-    parser.add_argument(
-        "--data_parallel_size",
-        default=1,
-        type=int,
-        help="data parallel size",
-    )
-    parser.add_argument(
-        "--tensor_parallel_size",
-        default=1,
-        type=int,
-        help="tensor parallel size",
-    )
-    parser.add_argument(
         "--task",
         default=None,
         type=str,
@@ -155,33 +89,16 @@ def setup_parser() -> argparse.ArgumentParser:
         type=str,
         help="Post Process",
     )
-    parser.add_argument(
-        "--rescore",
-        action="store_true",
-        help="Rescore the output",
-    )
+    # parser.add_argument(
+    #     "--rescore",
+    #     action="store_true",
+    #     help="Rescore the output",
+    # )
     parser.add_argument(
         "--system_message",
         default=None,
         type=str,
         help="Custom system message",
-    )
-    parser.add_argument(
-        "--use_system_role",
-        action="store_true",
-        help="Put System message in the system role (might not be available for all models)",
-    )
-    parser.add_argument(
-        "--n_samples",
-        default=None,
-        type=int,
-        help="Number of samples to infer on",
-    )
-    parser.add_argument(
-        "--batch_size",
-        default=1,
-        type=int,
-        help="Batch size",
     )
     parser.add_argument(
         "--use_output_path_only",
@@ -326,7 +243,7 @@ def main():
         # args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
     aux_task_args = {}
     if args.no_system_role:
-        aux_task_args["system_role"] = None
+        aux_task_args["system_role"] = False
 
     if args.post and (args.post in POSTPROCESS):
         aux_task_args["postprocessor"] = POSTPROCESS[args.post]
@@ -335,14 +252,8 @@ def main():
         model=args.model,
         api_key=api_key,
         api_base=api_base,
-        #inference_kwargs=args.inference_kwargs,
-        #model_system=model_system,
-        #eval_dataset,
-        #run_name=task_run_name,
         system_message=args.system_message,
         output_path=args.output_path,
-        #inference_args=vars(args),
-        #verbose=args.verbose,
         use_run_name=~args.use_output_path_only
         )
 
@@ -350,10 +261,10 @@ def main():
         from codethink.dataset import import_modules
         logger.warning(f"Importing modules from {args.include_path}")
         import_modules(args.include_path)
-        #ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
+        # ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
         # ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
-    #else:
-    ALL_TASK_LIST = TASK_LIST
+    else:
+        ALL_TASK_LIST = TASK_LIST
 
     if args.data_kwargs is not None:
         data_kwargs = eval(args.data_kwargs)
