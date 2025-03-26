@@ -194,7 +194,8 @@ class EvaluateSystem:
                     "ground_truth": gt,
                     "answer": ans,
                     # "user_input": inp,
-                    **output_dict,
+                    # **output_dict,
+                    **(output_dict["log"] if "log" in output_dict else {}),
                     **steps,
                 }
             )
@@ -237,7 +238,7 @@ class EvaluateSystem:
         sampling_args = sampling_args or {}
         new_state = {}
         x, y = task.dataset.__getitem__(idx)
-        new_state["raw_input"] = x
+        # new_state["raw_input"] = x
         new_state["ground_truth"] = y
         x, state = task.preprocess(x, state)
         if self.system_message is not None:
@@ -246,7 +247,12 @@ class EvaluateSystem:
             x = task.build_message(x, state)
         new_state["full_input"] = x
         o, _state = await self.fetch_completion(x, self.sampling_args)
-        new_state = {**new_state, **_state}
+
+        new_state["completion"] = o
+        if task.logging:
+            new_state["log"] = task.logging(_state)
+            # new_state["log"] = {}
+        # new_state = {**new_state, **_state}
         if isinstance(o, list):
             o = [list(task.postprocess(_o, state, fn=self.postprocessor))[0] for _o in o]
             sample_score = [task.eval(_o, y) for _o in o]
@@ -267,9 +273,7 @@ class EvaluateSystem:
             o, state = task.postprocess(o, state, fn=self.postprocessor)
             new_state["eval"] = self.eval(o, y)
         new_state["output"] = o
-        if task.logging:
-            new_state["log"] = task.logging(new_state)
-            # new_state["log"] = {}
+
         return o, new_state
 
     async def infer(self, task, idx, system_message=None):
