@@ -1,0 +1,105 @@
+import re
+import sys
+import requests
+import subprocess
+import pandas as pd
+# from zeno_client import ZenoClient, ZenoMetric
+# TODO: Function to fill in results to a csv or google spreadsheet
+
+
+def simple_parse_args_string(args_string):
+    """
+    Parses something like
+        args1=val1,arg2=val2
+    Into a dictionary
+    """
+    args_string = args_string.strip()
+    if not args_string:
+        return {}
+    arg_list = [arg for arg in args_string.split(",") if arg]
+    args_dict = {
+        k: handle_arg_string(v) for k, v in [arg.split("=") for arg in arg_list]
+    }
+    return args_dict
+
+
+def handle_arg_string(arg):
+    if arg.lower() == "true":
+        return True
+    elif arg.lower() == "false":
+        return False
+    elif arg.isnumeric():
+        return int(arg)
+    try:
+        return float(arg)
+    except ValueError:
+        return arg
+
+
+def calculate_tokens(tokens):
+    if isinstance(tokens, Tuple):
+        tokens = [tokens]
+
+    num_tokens = 0
+    for _tokens in tokens:
+        i_tokens, o_tokens = _tokens
+        num_tokens = len(i_tokens + o_tokens)
+
+    return num_tokens
+
+
+def zeno_upload(run_name, result_dict, metric_column="score"):
+
+
+    client = ZenoClient("zen_ItYuaijqhVoxmHR_ScDYpM43OBvq0eO1dw7FrE8o9gI")
+    df = pd.DataFrame(data=result_dict)
+
+    # Create a project.
+    project = client.create_project(
+        name=run_name,
+        view={
+            "data": {
+                "type": "text"
+            },
+            "label": {
+                "type": "text"
+            },
+            "output": {
+                "type": "code"
+            }
+        },
+        metrics=[
+            ZenoMetric(name="avg_score", type="mean", columns=["score"]),
+            ZenoMetric(name="avg_duration", type="mean", columns=["duration"]),
+            ZenoMetric(name="avg_input_tokens", type="mean", columns=["input_tokens"]),
+            ZenoMetric(name="avg_output_tokens", type="mean", columns=["output_tokens"]),
+            ZenoMetric(name="avg_total_tokens", type="mean", columns=["total_tokens"]),
+        ]
+    )
+
+    # Upload the data.
+    project.upload_dataset(df, id_column="idx", data_column="user_input", label_column="answer")
+    project.upload_system(df[["idx", "system_output"]], name="System A", id_column="idx", output_column="system_output")
+
+def check_api_health(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+    except requests.exceptions.RequestException:
+        return False
+
+def extract_fn(answer: str):
+    try:
+        extracted_answer = answer.split('####')[-1].strip()
+        if extracted_answer == answer:
+            match = re.search(r"answer is(\w)", answer)
+            if match:
+                return match.group(1)
+            else:
+                return answer
+        return extracted_answer
+    except:
+	    return answer

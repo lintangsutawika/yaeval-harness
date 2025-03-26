@@ -1,20 +1,23 @@
 import os
 import sys
+import asyncio
 import logging
-
+import requests
+import subprocess
 logging.basicConfig(
     format="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
     datefmt="%Y-%m-%d:%H:%M:%S",
-    level=logging.INFO,
+    level=logging.WARNING,
 )
 
 import argparse
 import importlib.util
 
-
 from codethink.utils import simple_parse_args_string
-from codethink import INTERFACE, SYSTEM_MESSAGE
-from codethink.dataset import DATASET as TASK_LIST
+
+from codethink.task import TASK_LIST
+from codethink.prompt import PROMPT_LIST
+from codethink.response import POSTPROCESS
 from codethink.evaluation import EvaluateSystem
 
 logger = logging.getLogger(__name__)
@@ -22,13 +25,7 @@ logger = logging.getLogger(__name__)
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
-        "--model_str", "-m", type=str, help="Name of model e.g. `hf`"
-    )
-    parser.add_argument(
-        "--inference_mode", "-i",
-        type=str,
-        default="default",
-        help="Solve task by generating code or other test time inference approaches"
+        "--model", "-m", type=str, help="Name of model e.g. `hf`"
     )
     parser.add_argument(
         "--run_name",
@@ -37,63 +34,30 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Name of inference run",
     )
     parser.add_argument(
+        "--api_key",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--api_base",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--output_path",
         type=str,
         default=None,
         help="Path to output file",
     )
     parser.add_argument(
-        "--get_answer_expr",
-        type=str,
-        default="solution()",
-        help="Name of function to execute",
-    )
-    parser.add_argument(
-        "--get_answer_symbol",
-        type=str,
-        default=None,
-        help="Postprocessing answer",
+        "--serve", "-s",
+        action="store_true",
+        help="Serve model while also running evaluation",
     )
     parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Sets verbose",
-    )
-    parser.add_argument(
-        "--revision", "-r",
-        type=str,
-        default="main",
-        help="Set specific model version",
-    )
-    parser.add_argument(
-        "--model_kwargs", "-a",
-        default="",
-        type=str,
-        help="Comma separated string arguments for `from_pretrained`",
-    )
-    parser.add_argument(
-        "--device",
-        default=None,
-        type=str,
-        help="Set model in a particular device",
-    )
-    parser.add_argument(
-        "--device_map",
-        default="auto",
-        type=str,
-        help="Map model to device",
-    )
-    parser.add_argument(
-        "--temperature",
-        default=0.0,
-        type=float,
-        help="temperature",
-    )
-    parser.add_argument(
-        "--top_p",
-        default=1.0,
-        type=float,
-        help="top_p",
     )
     parser.add_argument(
         "--num_fewshot",
@@ -114,56 +78,27 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Number of seed",
     )
     parser.add_argument(
-        "--max_model_len",
-        default=4096,
-        type=int,
-        help="Max model lengths",
-    )
-    parser.add_argument(
-        "--data_parallel_size",
-        default=1,
-        type=int,
-        help="data parallel size",
-    )
-    parser.add_argument(
-        "--tensor_parallel_size",
-        default=1,
-        type=int,
-        help="tensor parallel size",
-    )
-    parser.add_argument(
         "--task",
         default=None,
         type=str,
         help="Task to evaluate model on",
     )
     parser.add_argument(
-        "--rescore",
-        action="store_true",
-        help="Rescore the output",
+        "--post",
+        default=None,
+        type=str,
+        help="Post Process",
     )
+    # parser.add_argument(
+    #     "--rescore",
+    #     action="store_true",
+    #     help="Rescore the output",
+    # )
     parser.add_argument(
         "--system_message",
         default=None,
         type=str,
         help="Custom system message",
-    )
-    parser.add_argument(
-        "--use_system_role",
-        action="store_true",
-        help="Put System message in the system role (might not be available for all models)",
-    )
-    parser.add_argument(
-        "--n_samples",
-        default=None,
-        type=str,
-        help="Number of samples to infer on",
-    )
-    parser.add_argument(
-        "--batch_size",
-        default=1,
-        type=int,
-        help="Batch size",
     )
     parser.add_argument(
         "--use_output_path_only",
@@ -188,9 +123,28 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
     )
     parser.add_argument(
+        "--keep",
+        action="store_true",
+        help="Keep the server running",
+    )
+    parser.add_argument(
         "--include_path",
         default=None,
         type=str,
+    )
+    parser.add_argument(
+        "--server_args",
+        default=None,
+        type=str,
+    )
+    parser.add_argument(
+        "--sample_args",
+        default=None,
+        type=str,
+    )
+    parser.add_argument(
+        "--no_system_role",
+        action="store_true",
     )
     return parser
 
@@ -237,8 +191,36 @@ def main():
 
     run_name = args.run_name
 
-    logger.info(f"Run: {run_name}")
-    logger.info(
+    api_key = args.api_key or "EMPTY"
+    api_base = args.api_base or "http://localhost:8000/v1"
+
+    if args.serve:
+        import time
+        import requests
+        import subprocess
+        from codethink.utils import check_api_health
+
+        def launch_vllm_serve():
+            # Construct the command to start the vLLM server
+            command = ["vllm", "serve", args.model, "--disable-log-stats"] 
+            if args.server_args:
+                server_args_dict = simple_parse_args_string(args.server_args)
+                server_args_dict = {f"--{k}":v for k,v in server_args_dict.items() if v is not None}
+                command += [str(item) for kv_pair in server_args_dict.items() for item in kv_pair]
+
+            # Start the process
+            process = subprocess.Popen(command, env={**os.environ, "VLLM_CONFIGURE_LOGGING": "0"})
+            return process
+
+        # Start the vLLM server
+        vllm_server = launch_vllm_serve()
+
+        url = "http://localhost:8000"
+        while not check_api_health(url.split("/v1")[0]+"/health"):
+            time.sleep(1)
+
+    logger.warning(f"Run: {run_name}")
+    logger.warning(
         "\n{} Run Configuration {}\n{}\n{}".format(
             "#"*33, "#"*33,
             "\n".join([" "*(32-len(key))+f"{key}: {value}" for key, value in vars(args).items()]),
@@ -247,7 +229,7 @@ def main():
         )
 
     if args.trust_remote_code:
-        logger.info(
+        logger.warning(
             "Passed `--trust_remote_code`, setting environment variable `HF_DATASETS_TRUST_REMOTE_CODE=true`"
         )
         # Adopted from https://github.com/EleutherAI/lm-evaluation-harness.git
@@ -259,33 +241,28 @@ def main():
         datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
 
         # args.model_kwargs = args.model_kwargs + ",trust_remote_code=True"
+    aux_task_args = {}
+    if args.no_system_role:
+        aux_task_args["system_role"] = False
 
-    if args.system_message is not None:
-        if args.system_message in SYSTEM_MESSAGE:
-            system_message = SYSTEM_MESSAGE[args.system_message]
-        else:
-            system_message = args.system_message
-    else:
-        system_message = SYSTEM_MESSAGE[args.inference_mode]
+    if args.post and (args.post in POSTPROCESS):
+        aux_task_args["postprocessor"] = POSTPROCESS[args.post]
 
-    model_system = INTERFACE[args.inference_mode](
-        model=args.model_str,
-        system_message=system_message,
-        get_answer_expr=args.get_answer_expr,
-        get_answer_symbol=args.get_answer_symbol,
-        verbose=args.verbose,
-        use_system_role=args.use_system_role,
-        trust_remote_code=args.trust_remote_code,
-        max_model_len=args.max_model_len,
-        tensor_parallel_size=args.tensor_parallel_size,
-        data_parallel_size=args.data_parallel_size,
-        model_kwargs=simple_parse_args_string(args.model_kwargs),
+    evaluator = EvaluateSystem(
+        model=args.model,
+        api_key=api_key,
+        api_base=api_base,
+        system_message=args.system_message,
+        output_path=args.output_path,
+        use_run_name=~args.use_output_path_only
         )
 
-    
     if args.include_path is not None:
-        ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
-        ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
+        from codethink.dataset import import_modules
+        logger.warning(f"Importing modules from {args.include_path}")
+        import_modules(args.include_path)
+        # ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
+        # ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
     else:
         ALL_TASK_LIST = TASK_LIST
 
@@ -303,39 +280,30 @@ def main():
     for task in task_list:
         logger.info(f"Task: {task}")
         if run_name is None:
-            task_run_name = f"{args.model_str}-{task}-{args.system_message}"
+            task_run_name = f"{args.model}-{task}-{args.system_message}"
         else:
             if len(task_list) > 1:
                 task_run_name = f"{run_name}-{task}-{args.system_message}"
             else:
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
-        eval_dataset = ALL_TASK_LIST[task](
-            num_fewshot=args.num_fewshot,
-            sampler=None,
-            n_samples=args.n_samples,
-            data_kwargs=data_kwargs,
-            **task_kwargs,
-        )
-
-        evaluator = EvaluateSystem(
-            model_system=model_system,
-            dataset=eval_dataset,
+        
+        asyncio.run(
+            evaluator.run(
+            ALL_TASK_LIST[task](name=task, **aux_task_args),
+            sampling_args=simple_parse_args_string(args.sample_args) if args.sample_args else None,
             run_name=task_run_name,
-            output_path=args.output_path,
-            run_args=vars(args),
-            batch_size=args.batch_size,
-            verbose=args.verbose,
-            use_run_name=False if args.use_output_path_only == True else True,
-        )
+            n_samples=args.n_samples
+        ))
 
-        evaluator.run(
-            temperature=args.temperature,
-            top_p=args.top_p,
-            repeat=args.repeat,
-            seed=args.seed
-        )
+    if args.serve and (args.keep == False):
+        def kill_vllm_serve(process):
+            process.terminate()
+            process.wait()
+
+        # Kill the vLLM server
+        kill_vllm_serve(vllm_server)
 
 if __name__ == "__main__":
-
+    # fire.Fire(main)
     main()

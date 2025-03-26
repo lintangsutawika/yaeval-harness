@@ -1,78 +1,176 @@
 import os
 import json
+import time
 import logging
 import datetime
 import jsonlines
+import concurrent.futures
+import asyncio
+from tqdm.asyncio import tqdm
 
-from tqdm import tqdm
+from openai import OpenAI, AsyncOpenAI
+# from tqdm import tqdm
+
+from functools import partial
 from typing import List, Tuple
 from torch.utils.data import DataLoader
 
-from codethink.utils import zeno_upload
+from vllm import SamplingParams
+
+from codethink.prompt import get_prompt
+from codethink.response import get_postprocess_fn
+from codethink.utils import check_api_health
+from codethink.utils.api_postprocess import vllm_postprocess
 
 logger = logging.getLogger(__name__)
 
-
 class EvaluateSystem:
     def __init__(self,
-                 dataset,
-                 model_system,
-                 run_name=None,
+                 model,
+                 api_key="EMPTY",
+                 api_base="http://localhost:8000/v1",
+                 api_process=vllm_postprocess,
                  output_path=None,
                  run_args=None,
                  use_run_name=True,
-                 batch_size=1,
                  verbose=False,
-                 **kwargs
+                 sampling_args=None,
+                 system_message=None,
+                 postprocessor=None,
+                 system_role="assistant",
+                 max_rps=500,
+                 **kwargs,
                  ):
-        self.dataset = dataset
-        self.data_loader = DataLoader(self.dataset, batch_size=batch_size)
-        self.model_system = model_system
+
+        self.model = model
+        self.output_path = output_path
+        self.run_args = run_args
+        self.use_run_name = use_run_name
+        self.verbose = verbose
+        self.max_rps = max_rps
+
+        self.sampling_args = sampling_args or {}
+        self.sampling_args["model"] = model
+
+        while check_api_health(
+            api_base.split("/v1")[0]+"/health"
+            ) is False:
+
+            logger.info("API is not available, retrying...")
+            time.sleep(5)
+
+        # self.client = OpenAI(
+        self.client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=api_base,
+        )
+        self.api_process = api_process
+        self.system_role = "assistant"
+        self.system_message, self.postprocessor = get_prompt(system_message)
+        # postprocessor can be overwritten by the system_message
+        self.postprocessor = get_postprocess_fn(postprocessor or self.postprocessor)
+        self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
+
+    async def fetch_completion(self, messages, sampling_args=None):
+        if sampling_args is not None:
+            sampling_args = {**self.sampling_args, **sampling_args}
+        else:
+            sampling_args = self.sampling_args
+
+        try:
+            response = await self.client.chat.completions.create(
+                messages=messages,
+                **sampling_args,
+            )
+            return self.api_process(response)
+            return response
+        except asyncio.CancelledError:
+            return None
+        except Exception as e:
+            print(f"Error fetching chat completion: {e}")
+            return {}
+
+    async def run(self, task, sampling_args=None, run_name=None, n_samples=None):
+
         if run_name is None:
             current_time = datetime.datetime.now()
             self.run_name = current_time.strftime("%Y-%m-%d-%H:%M:%S")
         else:
             self.run_name = run_name
-        self.output_path = output_path
-        self.use_run_name = use_run_name
-        self.run_args = run_args
-        self.verbose = verbose
 
-    def run(self, temperature=0.1, top_p=1.0, repeat=1, seed=None):
+        #if system_message is not None:
+        #    self.system_message = system_message
+
+        if sampling_args is not None:
+            self.sampling_args = {**self.sampling_args, **sampling_args}
+
         result_dict = {
             "n_samples": 0,
-            "duration": 0,
-            "total_tokens": 0,
-            "input_tokens": 0,
-            "output_tokens": 0,
         }
-        data_dict = {
-            "idx": [],
-            "answer": [],
-            "system_output": [],
-            "ground_truth": [],
-            "user_input": [],
-            "score": [],
-            "duration": [],
-            "input_tokens": [],
-            "output_tokens": [],
-            "total_tokens": [],
-        }
+
         output_json = []
         idx = 0
 
         user_input = []
         ground_truth = []
-        for inp, out in self.dataset:
-            user_input.append(inp)
-            ground_truth.append(out)
+        # Use ThreadPoolExecutor for concurrent 
+        # execution with a progress bar
 
-        ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
+        n_samples = n_samples or task.__len__()
 
-        for ans, gt, inp, output_dict in tqdm(zip(ans_list, ground_truth, user_input, output_dict_list), total=len(ans_list)):
-            ans = self.dataset.extract_answer(ans)
-            score_dict = self.dataset.eval(ans, gt)
-            score_string = ", ".join([f"{metric}: {score}" for metric,score in score_dict.items()])
+        def chunk_len(num, max_request):
+            ranges = []
+            n = num//max_request
+            for i in range(n):
+                ranges.append((0+i*max_request,max_request+i*max_request))
+
+            modulo = num%max_request
+            if modulo > 0:
+                ranges.append((n*max_request, n*max_request+modulo))
+
+            return ranges
+
+        n_ranges = chunk_len(n_samples, self.max_rps)
+        #with concurrent.futures.ThreadPoolExecutor(max_workers=256) as executor:
+        #    futures = [
+        #        executor.submit(
+        #                task.infer,
+        #                idx,
+        #                fetch_completions=self.fetch_completion,
+        #                sampling_args=sampling_args,
+        #                system_message=self.system_message,
+        #            ) for idx in range(n_samples)
+        #        ]
+
+        #    all_results = []
+        #    for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
+        #        all_results.append(future.result())
+                #try:
+                #    all_results.append(future.result())
+                #except Exception as e:
+                #    print(f"Request {i} failed with error: {e}")
+                #    pass
+        all_results = []
+        for n_range in n_ranges:
+            all_requests = [
+                self.infer(
+                    task,
+                    idx,
+                    # sampling_args=sampling_args,
+                    # system_message=self.system_message
+                    ) for idx in range(*n_range)
+            ]
+            chat_completions = await tqdm.gather(*all_requests)
+            all_results.extend([c for c in chat_completions if c is not None])
+        
+        for ans, steps in tqdm(all_results):
+            output_dict = steps["step"][-1]
+            inp = output_dict["full_input"]
+            gt = output_dict["ground_truth"]
+            score_dict = output_dict['eval']
+            score_string = ", ".join([
+                f"{metric}: {score}" for metric,score in score_dict.items()
+                ])
 
             if self.verbose:
                 logger.info(f"\nId: {idx}, {score_string}, Prediction: {ans}, Ground Truth: {gt}")
@@ -83,43 +181,34 @@ class EvaluateSystem:
                 else:
                     result_dict[metric] += score
 
-            result_dict["duration"] += output_dict["duration"]
-            result_dict["input_tokens"] += output_dict["input_len"]
-            result_dict["output_tokens"] += output_dict["output_len"]
-            result_dict["total_tokens"] += (output_dict["input_len"] + output_dict["output_len"])
+            if "log" in output_dict:
+                for key, value in output_dict["log"].items():
+                    if key in result_dict:
+                        result_dict[key] += value
+                    else:
+                        result_dict[key] = value
             output_json.append(
                 {
                     "idx": idx,
                     **score_dict,
                     "ground_truth": gt,
                     "answer": ans,
-                    "user_input": inp,
+                    # "user_input": inp,
                     **output_dict,
+                    **steps,
                 }
             )
 
-            # data_dict["idx"].append(int(idx))
-            # data_dict["answer"].append(ans)
-            # data_dict["system_output"].append(output_dict["system_output"])
-            # data_dict["ground_truth"].append(gt)
-            # data_dict["user_input"].append(user_input)
-            # data_dict["score"].append(score)
-            # data_dict["duration"].append(output_dict["duration"])
-            # data_dict["input_tokens"].append(output_dict["input_len"])
-            # data_dict["output_tokens"].append(output_dict["output_len"])
-            # data_dict["total_tokens"].append(output_dict["input_len"] + output_dict["output_len"])
             idx += 1
-        # zeno_upload(self.run_name, data_dict)
 
-        result_dict = {**self.run_args, **result_dict}
-        for metric, score in score_dict.items():
-            result_dict[f"avg_{metric}"] = result_dict[metric]/result_dict["n_samples"]
-        result_dict["avg_duration"] = result_dict["duration"]/result_dict["n_samples"]
-        result_dict["avg_input_tokens"] = result_dict["input_tokens"]/result_dict["n_samples"]
-        result_dict["avg_output_tokens"] = result_dict["output_tokens"]/result_dict["n_samples"]
-        result_dict["avg_total_tokens"] = result_dict["total_tokens"]/result_dict["n_samples"]
-        logger.info(f"{self.run_name} complete")
-        logger.info(
+        result_keys = list(result_dict.keys())
+        for key in result_keys:
+            if key == "n_samples":
+                continue
+            result_dict[f"avg_{key}"] = result_dict[key]/result_dict["n_samples"]
+        
+        logger.warning(f"{self.run_name} complete")
+        logger.warning(
             ",".join(
                 [f"{metric}: {result_dict[f'avg_{metric}']}" for metric in score_dict.keys()]
                 )
@@ -140,77 +229,120 @@ class EvaluateSystem:
                 with jsonlines.open(output_file, "w") as file:
                     file.write_all(output_json)
             except Exception as e:
-                print(e)
+                print("Error:", e)
 
         return 0
 
-class OracleEvaluation(EvaluateSystem):
+    async def run_step(self, task, idx, state=None, sampling_args=None):
+        sampling_args = sampling_args or {}
+        new_state = {}
+        x, y = task.dataset.__getitem__(idx)
+        new_state["raw_input"] = x
+        new_state["ground_truth"] = y
+        x, state = task.preprocess(x, state)
+        if self.system_message is not None:
+            x = task.build_message(x, state, system_message=self.system_message)
+        else:
+            x = task.build_message(x, state)
+        new_state["full_input"] = x
+        o, _state = await self.fetch_completion(x, self.sampling_args)
+        new_state = {**new_state, **_state}
+        if isinstance(o, list):
+            o = [list(task.postprocess(_o, state, fn=self.postprocessor))[0] for _o in o]
+            sample_score = [task.eval(_o, y) for _o in o]
+            new_state["eval"] = {}
+            for score in sample_score:
+                for metric_name, metric_score in score.items():
+                    if metric_name in new_state["eval"]:
+                        new_state["eval"][metric_name].append(metric_score)
+                    else:
+                        new_state["eval"][metric_name] = [metric_score]
+            if task.sample_agg_fn:
+                new_state["eval"] = {
+                    k: task.sample_agg_fn(
+                        new_state["eval"][k]
+                        ) for k in new_state["eval"].keys()
+                    }
+        else:
+            o, state = task.postprocess(o, state, fn=self.postprocessor)
+            new_state["eval"] = self.eval(o, y)
+        new_state["output"] = o
+        if task.logging:
+            new_state["log"] = task.logging(new_state)
+            # new_state["log"] = {}
+        return o, new_state
 
-    def run(self, temperature=0.1, top_p=1.0, repeat=1, seed=None):
+    async def infer(self, task, idx, system_message=None):
+        state = {
+            "sample_id": idx,
+            "current_step": 0,
+            "step": []
+            }
 
-        result_dict = {
-            "n_samples": 0,
-            "score": 0,
-            "duration": 0,
-            "total_tokens": 0,
-            "input_tokens": 0,
-            "output_tokens": 0,
-        }
-        output_json = []
-        idx = 0
+        if task.subtask_list is None:
+            # while task.terminate:
+            output, _state = await self.run_step(
+                                            task,
+                                            idx,
+                                            state,
+                                            # sampling_args=self.sampling_args
+                                            )
+            state["step"].append(
+                {"step_id": 0,
+                "task": task.name,
+                **_state}
+            )
+            return output, state
 
-        while True:
-            for sample in tqdm(self.data_loader):
-                user_input, ground_truth = sample
+        for _id, task in enumerate(task.subtask_list):
+            # while task.terminate:
+            # self.sampling_args = {**sampling_args, **task.sampling_args}
+            output, _state = await self.run_step(
+                                            task,
+                                            idx,
+                                            state=state,
+                                            # sampling_args=self.sampling_args,
+                                            )
+            state["step"].append(
+                {"step_id": _id,
+                 "task": task.name,
+                 **_state}
+            )
+            state["current_step"] += 1
 
-                ans_list, output_dict_list = self.model_system.run(user_input, temperature=temperature, top_p=top_p, repeat=repeat, seed=seed)
+        return output, state
 
-                for ans, gt, inp, output_dict in zip(ans_list, ground_truth, user_input, output_dict_list):
-                    score = self.dataset.eval(ans, gt)
+    def build_message(self, x, state=None):
 
-                    if float(score) != 1.0:
-                        ans, gt, inp, 
+        if "system_message" in state:
+            system_message = state["system_message"]
+        else:
+            system_message = self.system_message
 
-                    # if self.verbose:
-                    logger.info(f"\nId: {idx}, Score: {score}, Prediction: {ans}, Ground Truth: {gt}")
-                    result_dict["n_samples"] += 1
-                    result_dict["score"] += score
-                    result_dict["duration"] += output_dict["duration"]
-                    result_dict["input_tokens"] += output_dict["input_len"]
-                    result_dict["output_tokens"] += output_dict["output_len"]
-                    result_dict["total_tokens"] += (output_dict["input_len"] + output_dict["output_len"])
-                    output_json.append(
-                        {
-                            "idx": idx,
-                            "score": score,
-                            "ground_truth": gt,
-                            "answer": ans,
-                            "user_input": inp,
-                            **output_dict,
-                        }
+        if system_message in SYSTEM_MESSAGE:
+            system_message = SYSTEM_MESSAGE[system_message]
+
+        message = [{"role": "user", "content": x}]
+        system_role = self.system_role
+        if system_message is not None:
+            if system_role:
+                message.insert(
+                    0, 
+                    {"role": system_role, "content": system_message}
                     )
+            else:
+                return [{"role": "user", "content": system_message+"\n\n"+x}]
 
-        result_dict = {**self.run_args, **result_dict}
-        result_dict["avg_score"] = result_dict["score"]/result_dict["n_samples"]
-        result_dict["avg_duration"] = result_dict["duration"]/result_dict["n_samples"]
-        result_dict["avg_input_tokens"] = result_dict["input_tokens"]/result_dict["n_samples"]
-        result_dict["avg_output_tokens"] = result_dict["output_tokens"]/result_dict["n_samples"]
-        result_dict["avg_total_tokens"] = result_dict["total_tokens"]/result_dict["n_samples"]
-        logger.info(f"{self.run_name} complete")
-        logger.info("Score: {}".format(result_dict["avg_score"]))
+        return message
 
-        if self.output_path is not None:
-            run_path = os.path.join(self.output_path, self.run_name)
-            os.makedirs(run_path, exist_ok=True)
-            result_file = os.path.join(run_path, "result.json")
-            with open(result_file, 'w', encoding='utf-8') as file:
-                json.dump(result_dict, file, ensure_ascii=False, indent=4)
 
-            try:
-                output_file = os.path.join(run_path, "output.jsonl")
-                with jsonlines.open(output_file, "w") as file:
-                    file.write_all(output_json)
-            except Exception as e:
-                print(e)
 
-        return 0
+
+
+
+
+
+
+
+
+
