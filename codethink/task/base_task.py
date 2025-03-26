@@ -28,7 +28,7 @@ class YevalTask:
     system_message: Union[str, YevalPrompt] = None
     evaluation: Union[str, Dict[str, Callable]]="match"
     sampling_args: dict =None
-    system_role: str = "system"
+    system_role: str = "assistant"
     logging: callable = None
     sample_agg_fn: callable = np.mean
     data_path: str=None
@@ -59,7 +59,7 @@ class YevalTask:
         preprocessor: Union[str, callable] = None,
         postprocessor: Union[str, callable] = None,
         system_message: Union[str, YevalPrompt] = None,
-        system_role: str = "system",
+        system_role: str = None,
         sampling_args: dict = None,
         num_fewshot: Union[int, float] = None,
         n_samples: Union[int, float] = None,
@@ -98,7 +98,10 @@ class YevalTask:
         self.sample_agg_fn = getattr(self.sample_agg_fn, '__func__', self.sample_agg_fn)
         self.logging = getattr(self.logging, '__func__', self.logging)
 
-        self.system_role = system_role or self.system_role
+        if system_role is False:
+            self.system_role = False
+        else:
+            self.system_role = system_role or self.system_role
         self.n_samples = n_samples or self.n_samples
         self.num_fewshot = num_fewshot or self.num_fewshot
         self.sampling_args = sampling_args or self.sampling_args

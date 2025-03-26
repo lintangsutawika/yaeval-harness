@@ -1,7 +1,3 @@
-import re
-import os
-from functools import partial
-
 from codethink.task import register_task, YevalTask
 
 from codethink.logging.usage import log_token_usage
@@ -10,8 +6,6 @@ from codethink.response import (
         preprocess_routing,
         postprocess_routing
         )
-
-dir_path = os.path.dirname(os.path.realpath(__file__))
 
 def cqa_input(x):
     choices = x["choices"]
@@ -55,7 +49,7 @@ class CommonsenseQATask(YevalTask):
 class CommonsenseQARoutingNLFirstTask(CommonsenseQATask):
     input_text=lambda x: x['question']+"\n\nWhich method is the best way to solve this problem?"
     output_text=lambda x: "natural language"
-    system_message="routing_selection_nl_first"
+    system_message="select_nl_first"
     sampling_args={"stop": ["\n\n", "\n"]}
     evaluation={"accuracy": match_routing}
 
@@ -63,7 +57,7 @@ class CommonsenseQARoutingNLFirstTask(CommonsenseQATask):
 class CommonsenseQARoutingPLFirstTask(CommonsenseQATask):
    input_text=lambda x: x['question']+"\n\nWhich method is the best way to solve this problem?"
    output_text=lambda x: "natural language"
-   system_message="routing_selection_pl_first"
+   system_message="select_pl_first"
    sampling_args={"stop": ["\n\n", "\n"]}
    evaluation={"accuracy": match_routing}
 
@@ -72,14 +66,14 @@ class CommonsenseQARoutingStage(CommonsenseQATask):
    preprocessor=preprocess_routing
    postprocessor=postprocess_routing
 
-@register_task("commonsense_qa-routing_pipeline_nl_first")
+@register_task("commonsense_qa_routing_nl_first")
 class CommonsenseQARoutingATask(YevalTask):
    subtask_list=[
        CommonsenseQARoutingNLFirstTask,
        CommonsenseQARoutingStage
    ]
 
-@register_task("commonsense_qa-routing_pipeline_pl_first")
+@register_task("commonsense_qa_routing_pl_first")
 class CommonsenseQARoutingBTask(YevalTask):
    subtask_list=[
        CommonsenseQARoutingPLFirstTask,
