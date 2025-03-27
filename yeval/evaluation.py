@@ -247,13 +247,14 @@ class EvaluateSystem:
             x = task.build_message(x, state)
         new_state["full_input"] = x
         o, _state = await self.fetch_completion(x, task.sampling_args)
+        task.check_termination(o[0], state)
         new_state["completion"] = o
         if task.logging:
             new_state["log"] = task.logging(_state)
             # new_state["log"] = {}
         # new_state = {**new_state, **_state}
         if isinstance(o, list):
-            o = [task.postprocess(_o, new_state, fn=self.postprocessor) for _o in o]
+            o = [task.postprocess(_o, new_state, fn=self.postprocessor)[0] for _o in o]
             sample_score = [task.eval(_o, y) for _o in o]
             new_state["eval"] = {}
             for score in sample_score:
@@ -284,35 +285,43 @@ class EvaluateSystem:
 
         if task.subtask_list is None:
             # while task.terminate:
-            output, _state = await self.run_step(
-                                            task,
-                                            idx,
-                                            state,
-                                            # sampling_args=self.sampling_args
-                                            )
-            state["step"].append(
-                {"step_id": 0,
-                "task": task.name,
-                **_state}
-            )
+            while True:
+                output, _state = await self.run_step(
+                                                task,
+                                                idx,
+                                                state,
+                                                # sampling_args=self.sampling_args
+                                                )
+                state["step"].append(
+                    {"step_id": 0,
+                    "task": task.name,
+                    **_state}
+                )
+                state["current_step"] += 1
+
+                if task.terminate:
+                    break
             return output, state
 
         for _id, task in enumerate(task.subtask_list):
-            # while task.terminate:
+            while True:
             # self.sampling_args = {**sampling_args, **task.sampling_args}
-            output, _state = await self.run_step(
-                                            task,
-                                            idx,
-                                            state=state,
-                                            # sampling_args=self.sampling_args,
-                                            )
-            state["step"].append(
-                {"step_id": _id,
-                 "task": task.name,
-                 **_state}
-            )
-            state["current_step"] += 1
+                output, _state = await self.run_step(
+                                                task,
+                                                idx,
+                                                state=state,
+                                                # sampling_args=self.sampling_args,
+                                                )
 
+                state["step"].append(
+                    {"step_id": _id,
+                    "task": task.name,
+                    **_state}
+                )
+                state["current_step"] += 1
+
+                if task.terminate:
+                    break
         return output, state
 
     def build_message(self, x, state=None):
