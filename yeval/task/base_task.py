@@ -47,6 +47,8 @@ class YevalTask:
     n_samples: Union[int, float]=None
     data_kwargs: dict=None
     batch_processing: bool=False
+    loop_exit: Callable=None
+    loop_max: int=1
 
     @staticmethod
     def _input_text(self, x):
@@ -112,9 +114,15 @@ class YevalTask:
 
         _postprocessor = None
         if self.system_message is not None:
-            self.system_message, _postprocessor = get_prompt(self.system_message)
+            if isinstance(self.system_message, str):
+                _postprocessor = None
+            else:
+                self.system_message, _postprocessor = get_prompt(self.system_message)
         elif system_message is not None:
-            self.system_message, _postprocessor = get_prompt(system_message)
+            if isinstance(system_message, str):
+                _postprocessor = None
+            else:
+                self.system_message, _postprocessor = get_prompt(system_message)
 
         if _postprocessor is None:
             # postprocessor can be overwritten by the system_message
@@ -136,13 +144,25 @@ class YevalTask:
         # self.sampling_args = sampling_args or {}
         # self.system_role = system_role
 
+        self.terminate = False
+        self.loop_exit = getattr(self.loop_exit, '__func__', self.loop_exit)
+
     def __len__(self):
         if self.dataset is None:
             return self.subtask_list[0].__len__()
         return len(self.dataset)
 
-    def terminate(self):
-        return True
+    def check_termination(self, x, state, fn=None):
+        fn = fn or self.loop_exit
+        current_step = state["current_step"]
+        if current_step == (self.loop_max-1):
+            self.terminate = True
+        else:
+            if fn is not None:
+                try:
+                    self.terminate = fn(x, state)
+                except Exception as e:
+                    self.terminate = fn(x)
 
     def preprocess(self, x, state=None, fn=None):
         fn = fn or self.preprocessor
