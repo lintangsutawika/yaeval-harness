@@ -21,10 +21,10 @@ def remove_boxed(s):
         assert s[: len(left)] == left
         return s[len(left) :]
 
-    try:
-        s = re.search(r"\\boxed{(.*?)}", s)[0]
-    except:
-        pass
+    # try:
+    #     s = re.search(r"\\boxed{(.*?)}", s)[0]
+    # except:
+    #     pass
 
     left = "\\boxed{"
     # s = s.split(left)[1:]
