@@ -77,7 +77,7 @@ class YevalTask:
                 data_name=self.data_name,
                 input_text=self.input_text.__func__,
                 output_text=self.output_text.__func__,
-                preprocessing=self.preprocessing,
+                preprocessing=self.preprocessing.__func__ if self.preprocessing else None,
                 test_split=self.test_split,
                 fewshot_input_text=self.fewshot_input_text.__func__ if self.fewshot_input_text else None,
                 fewshot_output_text=self.fewshot_output_text.__func__ if self.fewshot_output_text else None,
