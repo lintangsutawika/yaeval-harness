@@ -123,7 +123,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--n_samples",
-        default=-1,
+        default=None,
         type=int,
         help="Number of samples to evaluate",
     )
