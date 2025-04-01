@@ -255,7 +255,10 @@ class EvaluateSystem:
         # new_state = {**new_state, **_state}
         if isinstance(o, list):
             o = [task.postprocess(_o, new_state, fn=self.postprocessor)[0] for _o in o]
-            sample_score = [task.eval(_o, y) for _o in o]
+            if task.eval_at_k:
+                sample_score = [task.eval(o, y)]
+            else:
+                sample_score = [task.eval(_o, y) for _o in o]
             new_state["eval"] = {}
             for score in sample_score:
                 for metric_name, metric_score in score.items():

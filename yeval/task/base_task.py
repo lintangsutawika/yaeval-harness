@@ -49,6 +49,7 @@ class YevalTask:
     batch_processing: bool=False
     loop_exit: Callable=None
     loop_max: int=1
+    eval_at_k: bool=False
 
     @staticmethod
     def _input_text(self, x):
