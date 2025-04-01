@@ -1,5 +1,6 @@
 import os
 import sys
+import atexit
 import asyncio
 import logging
 import requests
@@ -212,8 +213,22 @@ def main():
             process = subprocess.Popen(command, env={**os.environ, "VLLM_CONFIGURE_LOGGING": "0"})
             return process
 
+        def kill_vllm_serve(process):
+            process.terminate()
+            process.wait()
+
+        def on_exit(args, process):
+            # Kill the vLLM server
+            if args.serve and (args.keep == False):
+                logging.info("Killing vLLM server")
+                kill_vllm_serve(process)
+
         # Start the vLLM server
         vllm_server = launch_vllm_serve()
+        atexit.register(
+            on_exit,
+            args=args, process=vllm_server
+        )
 
         url = "http://localhost:8000"
         while not check_api_health(url.split("/v1")[0]+"/health"):
@@ -292,13 +307,6 @@ def main():
             n_samples=args.n_samples
         ))
 
-    if args.serve and (args.keep == False):
-        def kill_vllm_serve(process):
-            process.terminate()
-            process.wait()
-
-        # Kill the vLLM server
-        kill_vllm_serve(vllm_server)
 
 if __name__ == "__main__":
     # fire.Fire(main)
