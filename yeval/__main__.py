@@ -203,14 +203,23 @@ def main():
 
         def launch_vllm_serve():
             # Construct the command to start the vLLM server
-            command = ["vllm", "serve", args.model, "--disable-log-stats"] 
+            command = ["vllm", "serve", args.model, "--disable-log-stats"]
             if args.server_args:
                 server_args_dict = simple_parse_args_string(args.server_args)
                 server_args_dict = {f"--{k}":v for k,v in server_args_dict.items() if v is not None}
+                if "max_model_len" not in server_args_dict:
+                    server_args_dict["--max_model_len"] = 4096
                 command += [str(item) for kv_pair in server_args_dict.items() for item in kv_pair]
 
             # Start the process
-            process = subprocess.Popen(command, env={**os.environ, "VLLM_CONFIGURE_LOGGING": "0"})
+            with open("serve.log", "w") as log_file:
+                process = subprocess.Popen(
+                    command,
+                    env={**os.environ, "VLLM_CONFIGURE_LOGGING": "0"},
+                    stdout=log_file,
+                    stderr=subprocess.STDOUT,
+                )
+
             return process
 
         def kill_vllm_serve(process):
