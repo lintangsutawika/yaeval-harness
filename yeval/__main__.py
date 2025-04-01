@@ -258,13 +258,9 @@ def main():
         )
 
     if args.include_path is not None:
-        from yeval.dataset import import_modules
+        from yeval.task import import_modules
         logger.warning(f"Importing modules from {args.include_path}")
         import_modules(args.include_path)
-        # ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
-        # ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
-    else:
-        ALL_TASK_LIST = TASK_LIST
 
     if args.data_kwargs is not None:
         data_kwargs = eval(args.data_kwargs)
@@ -290,7 +286,7 @@ def main():
         
         asyncio.run(
             evaluator.run(
-            ALL_TASK_LIST[task](name=task, **aux_task_args),
+            TASK_LIST[task](name=task, **aux_task_args),
             sampling_args=simple_parse_args_string(args.sample_args) if args.sample_args else None,
             run_name=task_run_name,
             n_samples=args.n_samples
