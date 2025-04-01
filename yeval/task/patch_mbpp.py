@@ -13,7 +13,7 @@ def apply_patch(patch_code, base_code):
 def postprocess_patch(x, state):
     original_input = state["full_input"][0]["content"]
     base_code = [line for line in original_input.split("<|diff|>") if line != ""][-1]
-    
+
     if "@@" in base_code:
         current_code = "\n".join(apply_patch(base_code, ""))
     else:
@@ -56,11 +56,9 @@ def exit_fn(x, state):
         return False
 
 def pass_at_1(completion, test):
-    # print(completion)
     try:
         test_program = completion + "\n" + "\n".join(test)
         subprocess_result = subprocess.run([sys.executable, "-c", test_program], timeout=10, text=True, capture_output=True)
-        # print(subprocess_result)
         if subprocess_result.returncode == 0:
             return 1
         return 0
@@ -76,23 +74,26 @@ class MBPPStep(YevalTask):
     loop_exit=exit_fn
     output_text=lambda x: x["test_list"]
     test_split="test"
+    evaluation={"pass@1": pass_at_1}
+    preprocessor=preprocess_patch
+    postprocessor=postprocess_patch
+
+@register_task("gsm8k_patch_by_patch")
+class GSM8kStep(MBPPStep):
+    data_path="openai/gsm8k"
+    data_name="main"
+    # Write a function to solve the following problem.\n
+    input_text=lambda x: f"{x['question']}\n<|diff|>{convert_to_patch('def solution():')}\n<|diff|>"
+    sampling_args={"stop": ["<|diff|>@@"]}
+    loop_max=10
+    loop_exit=exit_fn
+    output_text=lambda x: [f"assert solution() == {x["answer"].split("####")[-1].strip()}"]
+    test_split="test"
     # evaluation={"pass@1": lambda x,y: -1}
     evaluation={"pass@1": pass_at_1}
     preprocessor=preprocess_patch
     postprocessor=postprocess_patch
 
-# class MBPPNextStep(MBPPStep):
-    
-
-# @register_task("patch_mbpp")
-# class StepByStepMBPPTask(YevalTask):
-#     subtask_list=[
-#         MBPPStep,
-#         MBPPNextStep,
-#         MBPPNextStep,
-#         MBPPNextStep,
-#         MBPPNextStep,
-#     ]
 
 if __name__ == "__main__":
     pass
