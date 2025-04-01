@@ -1,6 +1,14 @@
 import os
 import glob
 import importlib
+import logging
+
+logging.basicConfig(
+    format="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
+    datefmt="%Y-%m-%d:%H:%M:%S",
+    level=logging.WARNING,
+)
+
 from functools import partial
 
 from .base_task import YevalTask
@@ -52,10 +60,13 @@ def import_modules(path=None):
     for file in module_files:
         module_name = os.path.basename(file)[:-3]
         if module_name != "__init__" and module_name.isidentifier():
-            spec = importlib.util.spec_from_file_location(f"{module_name}", file)
-            foo = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(foo)
-            # importlib.import_module(f".{module_name}", package=__name__)
+            try:
+                spec = importlib.util.spec_from_file_location(f"{module_name}", file)
+                foo = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(foo)
+                # importlib.import_module(f".{module_name}", package=__name__)
+            except Exception as e:
+                logging.warning(f"{file}: {e}")
 
 import_modules()
 
