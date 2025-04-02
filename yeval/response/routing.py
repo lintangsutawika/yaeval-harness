@@ -12,7 +12,7 @@ def match_routing(prediction, ground_truth):
 
 def preprocess_routing(x, state):
     current_step = state["current_step"]
-    solve_with = state["step"][current_step-1]["output"][0].split("\n")
+    solve_with = state["step"][current_step-1]["output"][0].split("\n")[0]
     if solve_with == "programming language":
         state["system_message"] = "code"
     elif solve_with == "natural language":
