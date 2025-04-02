@@ -287,13 +287,11 @@ class EvaluateSystem:
             }
 
         if task.subtask_list is None:
-            # while task.terminate:
             while True:
                 output, _state = await self.run_step(
                                                 task,
                                                 idx,
                                                 state,
-                                                # sampling_args=self.sampling_args
                                                 )
                 state["step"].append(
                     {"step_id": 0,
@@ -312,7 +310,6 @@ class EvaluateSystem:
                                                 task,
                                                 idx,
                                                 state=state,
-                                                # sampling_args=self.sampling_args,
                                                 )
 
                 state["step"].append(
