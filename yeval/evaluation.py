@@ -254,7 +254,7 @@ class EvaluateSystem:
             # new_state["log"] = {}
         # new_state = {**new_state, **_state}
         if isinstance(o, list):
-            o = [task.postprocess(_o, new_state, fn=self.postprocessor)[0] for _o in o]
+            o = [task.postprocess(_o, state, fn=self.postprocessor)[0] for _o in o]
             if task.eval_at_k:
                 sample_score = [task.eval(o, y)]
             else:
@@ -273,7 +273,7 @@ class EvaluateSystem:
                         ) for k in new_state["eval"].keys()
                     }
         else:
-            o, state = task.postprocess(o, new_state, fn=self.postprocessor)
+            o, state = task.postprocess(o, state, fn=self.postprocessor)
             new_state["eval"] = self.eval(o, y)
         new_state["output"] = o
 
@@ -308,7 +308,6 @@ class EvaluateSystem:
 
         for _id, task in enumerate(task.subtask_list):
             while True:
-            # self.sampling_args = {**sampling_args, **task.sampling_args}
                 output, _state = await self.run_step(
                                                 task,
                                                 idx,
@@ -322,7 +321,6 @@ class EvaluateSystem:
                     **_state}
                 )
                 state["current_step"] += 1
-
                 if task.terminate:
                     break
         return output, state

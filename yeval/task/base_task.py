@@ -147,6 +147,7 @@ class YevalTask:
 
         self.terminate = False
         self.loop_exit = getattr(self.loop_exit, '__func__', self.loop_exit)
+        self._counter = 0
 
     def __len__(self):
         if self.dataset is None:
@@ -155,10 +156,10 @@ class YevalTask:
 
     def check_termination(self, x, state, fn=None):
         fn = fn or self.loop_exit
-        current_step = state["current_step"]
-        if current_step == (self.loop_max-1):
+        if self._counter == (self.loop_max-1):
             self.terminate = True
         else:
+            self._counter += 1
             if fn is not None:
                 try:
                     self.terminate = fn(x, state)
