@@ -209,6 +209,7 @@ def main():
                 server_args_dict = {f"--{k}":v for k,v in server_args_dict.items() if v is not None}
                 if "max_model_len" not in server_args_dict:
                     server_args_dict["--max_model_len"] = 4096
+                    server_args_dict["--enable-chunked-prefill"] = False
                 command += [str(item) for kv_pair in server_args_dict.items() for item in kv_pair]
 
             # Start the process
