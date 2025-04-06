@@ -11,6 +11,8 @@ logging.basicConfig(
 
 from functools import partial
 
+from yeval.utils import import_modules
+
 from .base_task import YevalTask
 from .base_data import YevalDataset
 
@@ -46,29 +48,8 @@ def register_task(name,
         return obj
     return decorator
 
-def import_modules(path=None):
-
-    if path is None:
-        path = os.path.dirname(__file__)
-
-    module_files = glob.glob(
-        os.path.join(
-            path, "**", "*.py"
-            ), recursive=True
-        )
-
-    for file in module_files:
-        module_name = os.path.basename(file)[:-3]
-        if module_name != "__init__" and module_name.isidentifier():
-            try:
-                spec = importlib.util.spec_from_file_location(f"{module_name}", file)
-                foo = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(foo)
-                # importlib.import_module(f".{module_name}", package=__name__)
-            except Exception as e:
-                logging.warning(f"{file}: {e}")
-
-import_modules()
+path = os.path.dirname(__file__)
+import_modules(path)
 
 __all__ = list(TASK_LIST.keys())
 
