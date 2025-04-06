@@ -1,14 +1,13 @@
 from typing import Callable, Optional
 
 class YevalPrompt:
-    system_message: str
-    postprocessor: callable=None
+    system_message: str=None
+    user_message: Callable=None
+    postprocessor: Callable=None
 
-# SYSTEM_MESSAGE = {
-#     "none": "",
-#     "code_old": """\
-# Solve with the following approach: DIRECTLY and ONLY write a program with the PYTHON programming language. The function must be named solution() without any input arguments. At the end, you MUST return an single value.\
-# """,
+    def __new__(self):
+        return self.system_message, self.user_message, self.postprocessor
+
 #     "code": """\
 # Solve the following problem by DIRECTLY and ONLY writing a PYTHON program. The answer mush be a function named solution() without any input arguments. The function MUST return an single value.\
 # """,
