@@ -4,7 +4,7 @@ import numpy as np
 from dataclasses import dataclass
 from functools import partial
 from typing import Union, Callable, Dict, List
-from yeval.prompt import YevalPrompt, get_message_str, get_prompt
+from yeval.prompt import YevalPrompt, get_message, get_prompt
 from yeval.response import get_postprocess_fn
 
 from transformers import AutoTokenizer
@@ -26,6 +26,7 @@ class YevalTask:
     inference_fn: callable = None
     tokenizer: str = None
     system_message: Union[str, YevalPrompt] = None
+    user_message: Union[str, Callable, YevalPrompt] = None
     evaluation: Union[str, Dict[str, Callable]]="match"
     sampling_args: dict =None
     system_role: str = "assistant"
@@ -59,9 +60,10 @@ class YevalTask:
     def __init__(
         self,
         name: str = None,
-        preprocessor: Union[str, callable] = None,
-        postprocessor: Union[str, callable] = None,
+        preprocessor: Union[str, Callable] = None,
+        postprocessor: Union[str, Callable] = None,
         system_message: Union[str, YevalPrompt] = None,
+        user_message: Union[str, Callable, YevalPrompt] = None,
         system_role: str = None,
         sampling_args: dict = None,
         num_fewshot: Union[int, float] = None,
@@ -113,17 +115,26 @@ class YevalTask:
             self.preprocessor = preprocessor
         self.preprocessor = getattr(self.preprocessor, '__func__', self.preprocessor)
 
+        _user_message = None
         _postprocessor = None
         if self.system_message is not None:
             if isinstance(self.system_message, str):
-                _postprocessor = None
-            else:
-                self.system_message, _postprocessor = get_prompt(self.system_message)
+                self.system_message, _user_message, _postprocessor = get_prompt(self.system_message)
+            elif isinstance(self.system_message, YevalPrompt):
+                self.system_message, _user_message, _postprocessor = self.system_message()
         elif system_message is not None:
             if isinstance(system_message, str):
+                _user_message = None
                 _postprocessor = None
             else:
-                self.system_message, _postprocessor = get_prompt(system_message)
+                self.system_message, _user_message, _postprocessor = system_message()
+
+        if self.user_message is not None:
+            raise NotImplementedError
+        if user_message is not None:
+            raise user_message
+
+        self.user_message = user_message or _user_message
 
         if _postprocessor is None:
             # postprocessor can be overwritten by the system_message
@@ -147,7 +158,6 @@ class YevalTask:
 
         self.terminate = False
         self.loop_exit = getattr(self.loop_exit, '__func__', self.loop_exit)
-        self._counter = 0
 
     def __len__(self):
         if self.dataset is None:
@@ -156,10 +166,11 @@ class YevalTask:
 
     def check_termination(self, x, state, fn=None):
         fn = fn or self.loop_exit
-        if self._counter == (self.loop_max-1):
+        current_loop = state["current_loop"]
+        if current_loop == (self.loop_max-1):
             self.terminate = True
         else:
-            self._counter += 1
+            current_loop += 1
             if fn is not None:
                 try:
                     self.terminate = fn(x, state)
@@ -186,7 +197,7 @@ class YevalTask:
         else:
             return x, state
 
-    def build_message(self, x, state=None, system_message=None):
+    def build_message(self, x, state=None, system_message=None, user_message=None):
 
         if system_message is not None:
             system_message = system_message
@@ -195,17 +206,27 @@ class YevalTask:
         else:
             system_message = self.system_message
 
-        system_message = get_message_str(system_message)
+        if isinstance(system_message, Callable):
+            system_message = system_message(x)
 
-        message = [{"role": "user", "content": x}]
-        if system_message is not None:
-            if self.system_role:
-                message.insert(
-                    0, 
-                    {"role": self.system_role, "content": system_message}
-                    )
-            else:
-                return [{"role": "user", "content": system_message+"\n\n"+x}]
+        if user_message is not None:
+            user_message = user_message
+        elif "user_message" in state:
+            user_message = state["user_message"]
+        else:
+            user_message = self.user_message
+
+        if isinstance(user_message, Callable):
+            user_message = user_message(x)
+
+        message = [{"role": "user", "content": user_message}]
+        if self.system_role:
+            message.insert(
+                0, 
+                {"role": self.system_role, "content": system_message}
+                )
+        else:
+            return [{"role": "user", "content": system_message+"\n\n"+user_message}]
 
         return message
 
