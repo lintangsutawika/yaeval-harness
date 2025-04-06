@@ -328,38 +328,3 @@ class EvaluateSystem:
                     break
         state["task_step"] += 1
         return output, state
-
-    def build_message(self, x, state=None):
-
-        if "system_message" in state:
-            system_message = state["system_message"]
-        else:
-            system_message = self.system_message
-
-        if system_message in SYSTEM_MESSAGE:
-            system_message = SYSTEM_MESSAGE[system_message]
-
-        message = [{"role": "user", "content": x}]
-        system_role = self.system_role
-        if system_message is not None:
-            if system_role:
-                message.insert(
-                    0, 
-                    {"role": system_role, "content": system_message}
-                    )
-            else:
-                return [{"role": "user", "content": system_message+"\n\n"+x}]
-
-        return message
-
-
-
-
-
-
-
-
-
-
-
-
