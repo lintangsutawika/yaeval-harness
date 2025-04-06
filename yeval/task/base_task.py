@@ -23,8 +23,9 @@ class YevalTask:
     postprocessor: Union[str, Callable] = None
     inference_fn: callable = None
     tokenizer: str = None
-    system_message: Union[str, YevalPrompt] = None
-    user_message: Union[str, Callable, YevalPrompt] = None
+    prompt_message: Union[str, YevalPrompt] = None
+    system_message: Union[str, Callable] = None
+    user_message: Union[str, Callable] = None
     evaluation: Union[str, Dict[str, Callable]]="match"
     sampling_args: dict =None
     system_role: str = "assistant"
@@ -60,8 +61,9 @@ class YevalTask:
         name: str = None,
         preprocessor: Union[str, Callable] = None,
         postprocessor: Union[str, Callable] = None,
-        system_message: Union[str, YevalPrompt] = None,
-        user_message: Union[str, Callable, YevalPrompt] = None,
+        prompt_message:Union[str, YevalPrompt] = None,
+        system_message: Union[str, Callable] = None,
+        user_message: Union[str, Callable] = None,
         system_role: str = None,
         sampling_args: dict = None,
         num_fewshot: Union[int, float] = None,
@@ -121,21 +123,15 @@ class YevalTask:
         if system_message is not None:
             self.system_message = system_message
 
-        if self.system_message is not None:
-            if isinstance(self.system_message, str):
-                self.system_message, _user_message, _postprocessor = get_prompt(self.system_message)
-            elif isinstance(self.system_message, YevalPrompt):
-                self.system_message, _user_message, _postprocessor = self.system_message()
-        
-        # Overriding User message
-        if user_message is not None:
-            self.user_message = user_message
+        if prompt_message is not None:
+            self.prompt_message = prompt_message
+        if isinstance(self.prompt_message, str):
+            _system_message, _user_message, _postprocessor = get_prompt(self.prompt_message)
+        elif isinstance(self.prompt_message, YevalPrompt):
+            _system_message, _user_message, _postprocessor = self.prompt_message()
 
-        if self.user_message is not None:
-            if isinstance(self.user_message, str):
-                _system_message, self.user_message, _postprocessor = get_prompt(self.user_message)
-            elif isinstance(self.user_message, YevalPrompt):
-                _system_message, self.user_message, _postprocessor = self.user_message()
+        self.system_message = _system_message or system_message or self.system_message
+        self.user_message = _user_message or user_message or self.user_message
 
         if _postprocessor is None:
             # postprocessor can be overwritten by the system_message
