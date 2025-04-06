@@ -90,10 +90,10 @@ def setup_parser() -> argparse.ArgumentParser:
     #     help="Rescore the output",
     # )
     parser.add_argument(
-        "--system_message",
+        "--prompt_message",
         default=None,
         type=str,
-        help="Custom system message",
+        help="Custom prompt message",
     )
     parser.add_argument(
         "--use_output_path_only",
@@ -273,19 +273,19 @@ def main():
     if args.post and (args.post in POSTPROCESS):
         aux_task_args["postprocessor"] = POSTPROCESS[args.post]
 
+    if args.include_path is not None:
+        from yeval.utils import import_modules
+        logger.warning(f"Importing modules from {args.include_path}")
+        import_modules(args.include_path)
+
     evaluator = EvaluateSystem(
         model=args.model,
         api_key=api_key,
         api_base=api_base,
-        system_message=args.system_message,
+        prompt_message=args.prompt_message,
         output_path=args.output_path,
         use_run_name=~args.use_output_path_only
         )
-
-    if args.include_path is not None:
-        from yeval.task import import_modules
-        logger.warning(f"Importing modules from {args.include_path}")
-        import_modules(args.include_path)
 
     if args.data_kwargs is not None:
         data_kwargs = eval(args.data_kwargs)
@@ -301,14 +301,14 @@ def main():
     for task in task_list:
         logger.info(f"Task: {task}")
         if run_name is None:
-            task_run_name = f"{args.model}-{task}-{args.system_message}"
+            task_run_name = f"{args.model}-{task}-{args.prompt_message}"
         else:
             if len(task_list) > 1:
-                task_run_name = f"{run_name}-{task}-{args.system_message}"
+                task_run_name = f"{run_name}-{task}-{args.prompt_message}"
             else:
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
-        
+
         asyncio.run(
             evaluator.run(
             TASK_LIST[task](name=task, **aux_task_args),
