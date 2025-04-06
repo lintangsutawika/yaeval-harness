@@ -48,7 +48,7 @@ def get_prompt(prompt):
     if prompt in PROMPT_LIST:
         prompt = PROMPT_LIST[prompt]
     else:
-        return prompt, None, None
+        return None, None, None
 
     if issubclass(prompt, YevalPrompt):
         system_message = getattr(prompt, "system_message")
