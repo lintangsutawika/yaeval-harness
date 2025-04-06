@@ -254,7 +254,7 @@ class EvaluateSystem:
             # new_state["log"] = {}
         # new_state = {**new_state, **_state}
         if isinstance(o, list):
-            o = [task.postprocess(_o, state, fn=self.postprocessor)[0] for _o in o]
+            o = [task.postprocess(_o, {**state, **new_state}, fn=self.postprocessor)[0] for _o in o]
             if task.eval_at_k:
                 sample_score = [task.eval(o, y)]
             else:
@@ -273,8 +273,9 @@ class EvaluateSystem:
                         ) for k in new_state["eval"].keys()
                     }
         else:
-            o, state = task.postprocess(o, state, fn=self.postprocessor)
+            o, state = task.postprocess(o, {**state, **new_state}, fn=self.postprocessor)
             new_state["eval"] = self.eval(o, y)
+
         new_state["output"] = o
 
         return o, new_state
@@ -283,10 +284,12 @@ class EvaluateSystem:
         state = {
             "sample_id": idx,
             "current_step": 0,
+            "task_step": 0,
             "step": []
             }
 
         if task.subtask_list is None:
+            state["current_loop"] = 0
             while True:
                 output, _state = await self.run_step(
                                                 task,
@@ -299,12 +302,14 @@ class EvaluateSystem:
                     **_state}
                 )
                 state["current_step"] += 1
-
+                state["current_loop"] += 1
                 if task.terminate:
                     break
+            state["task_step"] += 1
             return output, state
 
         for _id, task in enumerate(task.subtask_list):
+            state["current_loop"] = 0
             while True:
                 output, _state = await self.run_step(
                                                 task,
@@ -318,8 +323,10 @@ class EvaluateSystem:
                     **_state}
                 )
                 state["current_step"] += 1
+                state["current_loop"] += 1
                 if task.terminate:
                     break
+        state["task_step"] += 1
         return output, state
 
     def build_message(self, x, state=None):
