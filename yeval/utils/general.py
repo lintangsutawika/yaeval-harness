@@ -129,9 +129,7 @@ def import_modules(path=None):
 
     for file in module_files:
         module_name = os.path.basename(file)[:-3]
-        if (module_name != "__init__") and module_name.isidentifier():
-        # if module_name not in ["__init__", "__main__"] and module_name.isidentifier():
-            # print(file)
+        if module_name not in ["__init__", "__main__"] and module_name.isidentifier():
             try:
                 spec = importlib.util.spec_from_file_location(f"{module_name}", file)
                 foo = importlib.util.module_from_spec(spec)
