@@ -35,7 +35,9 @@ class EvaluateSystem:
                  use_run_name=True,
                  verbose=False,
                  sampling_args=None,
+                 prompt_message=None,
                  system_message=None,
+                 user_message=None,
                  postprocessor=None,
                  system_role="assistant",
                  max_rps=500,
@@ -66,7 +68,7 @@ class EvaluateSystem:
         )
         self.api_process = api_process
         self.system_role = "assistant"
-        self.system_message, self.user_message, self.postprocessor = get_prompt(system_message)
+        self.system_message, self.user_message, self.postprocessor = get_prompt(prompt_message)
         # postprocessor can be overwritten by the system_message
         self.postprocessor = get_postprocess_fn(postprocessor or self.postprocessor)
         self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
