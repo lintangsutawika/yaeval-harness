@@ -19,8 +19,6 @@ class YevalTask:
 
     name: str = None
     subtask_list: list = None
-    # dataset = None,
-    # dataset_kwargs: dict = {},
     preprocessor: Union[str, Callable] = None
     postprocessor: Union[str, Callable] = None
     inference_fn: callable = None
