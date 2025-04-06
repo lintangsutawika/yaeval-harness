@@ -223,10 +223,17 @@ class YevalTask:
         else:
             user_message = self.user_message
 
-        if isinstance(user_message, Callable):
+        if user_message is None:
+            user_message = x
+        elif isinstance(user_message, Callable):
             user_message = user_message(x)
+        elif isinstance(user_message, str):
+            user_message = user_message + "\n" + x
 
         message = [{"role": "user", "content": user_message}]
+        if system_message is None:
+            return message
+
         if self.system_role:
             message.insert(
                 0, 
