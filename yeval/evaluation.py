@@ -66,7 +66,7 @@ class EvaluateSystem:
         )
         self.api_process = api_process
         self.system_role = "assistant"
-        self.system_message, self.postprocessor = get_prompt(system_message)
+        self.system_message, self.user_message, self.postprocessor = get_prompt(system_message)
         # postprocessor can be overwritten by the system_message
         self.postprocessor = get_postprocess_fn(postprocessor or self.postprocessor)
         self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
@@ -241,10 +241,12 @@ class EvaluateSystem:
         # new_state["raw_input"] = x
         new_state["ground_truth"] = y
         x, state = task.preprocess(x, state)
+        message_args = {}
         if self.system_message is not None:
-            x = task.build_message(x, state, system_message=self.system_message)
-        else:
-            x = task.build_message(x, state)
+            message_args["system_message"] = self.system_message
+        if self.user_message is not None:
+            message_args["user_message"] = self.user_message
+        x = task.build_message(x, state, **message_args)
         new_state["full_input"] = x
         o, _state = await self.fetch_completion(x, task.sampling_args)
         task.check_termination(o[0], state)
