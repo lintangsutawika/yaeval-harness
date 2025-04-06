@@ -113,26 +113,29 @@ class YevalTask:
             self.preprocessor = preprocessor
         self.preprocessor = getattr(self.preprocessor, '__func__', self.preprocessor)
 
+        _system_message = None
         _user_message = None
         _postprocessor = None
+
+        # Overriding System message
+        if system_message is not None:
+            self.system_message = system_message
+
         if self.system_message is not None:
             if isinstance(self.system_message, str):
                 self.system_message, _user_message, _postprocessor = get_prompt(self.system_message)
             elif isinstance(self.system_message, YevalPrompt):
                 self.system_message, _user_message, _postprocessor = self.system_message()
-        elif system_message is not None:
-            if isinstance(system_message, str):
-                _user_message = None
-                _postprocessor = None
-            else:
-                self.system_message, _user_message, _postprocessor = system_message()
+        
+        # Overriding User message
+        if user_message is not None:
+            self.user_message = user_message
 
         if self.user_message is not None:
-            raise NotImplementedError
-        if user_message is not None:
-            raise user_message
-
-        self.user_message = user_message or _user_message
+            if isinstance(self.user_message, str):
+                _system_message, self.user_message, _postprocessor = get_prompt(self.user_message)
+            elif isinstance(self.user_message, YevalPrompt):
+                _system_message, self.user_message, _postprocessor = self.user_message()
 
         if _postprocessor is None:
             # postprocessor can be overwritten by the system_message
@@ -140,6 +143,12 @@ class YevalTask:
             self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
         else:
             self.postprocessor = _postprocessor
+
+        if _system_message is not None:
+            self.system_message = _system_message
+        
+        if _user_message is not None:
+            self.user_message = _user_message
 
         if isinstance(self.evaluation, Callable):
             self.evaluation = {"score": self.evaluation}
