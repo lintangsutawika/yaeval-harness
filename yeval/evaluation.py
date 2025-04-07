@@ -67,8 +67,11 @@ class EvaluateSystem:
             base_url=api_base,
         )
         self.api_process = api_process
-        self.system_role = "assistant"
+        self.system_role = system_role or "assistant"
         self.system_message, self.user_message, self.postprocessor = get_prompt(prompt_message)
+        
+        self.system_message = system_message or self.system_message
+        self.user_message = user_message or self.user_message
         # postprocessor can be overwritten by the system_message
         self.postprocessor = get_postprocess_fn(postprocessor or self.postprocessor)
         self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
