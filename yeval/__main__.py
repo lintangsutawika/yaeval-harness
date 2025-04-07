@@ -96,6 +96,18 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Custom prompt message",
     )
     parser.add_argument(
+        "--system_message",
+        default=None,
+        type=str,
+        help="Custom system message",
+    )
+    parser.add_argument(
+        "--user_message",
+        default=None,
+        type=str,
+        help="Custom user message",
+    )
+    parser.add_argument(
         "--use_output_path_only",
         action="store_true",
         help="directly save output to output path",
@@ -283,6 +295,8 @@ def main():
         api_key=api_key,
         api_base=api_base,
         prompt_message=args.prompt_message,
+        system_message=args.system_message,
+        user_message=args.user_message,
         output_path=args.output_path,
         use_run_name=~args.use_output_path_only
         )
