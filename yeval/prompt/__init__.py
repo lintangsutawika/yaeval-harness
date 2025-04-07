@@ -17,14 +17,7 @@ def get_message(system_message):
     if system_message in PROMPT_LIST:
         system_message = PROMPT_LIST[system_message]()
 
-    print("PROMPT_LIST")
-    print(PROMPT_LIST)
     return system_message
-    # else:
-    #     if not issubclass(system_message, YevalPrompt):
-    #         raise TypeError(f"Expected a YevalPrompt subclass, got {type(system_message)}")
-    #     else:
-    #         return system_message.system_message
 
 def get_message_str(system_message):
     if system_message is None:
@@ -43,7 +36,7 @@ def get_message_str(system_message):
 
 def get_prompt(prompt):
     if prompt is None:
-        return None, None
+        return None, None, None
     postprocessor = None
     if prompt in PROMPT_LIST:
         prompt = PROMPT_LIST[prompt]
