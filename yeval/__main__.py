@@ -16,7 +16,7 @@ import importlib.util
 
 from yeval.utils import simple_parse_args_string
 
-from yeval.task import TASK_LIST
+from yeval.task import TASK_LIST, YevalTask
 from yeval.prompt import PROMPT_LIST
 from yeval.response import POSTPROCESS
 from yeval.evaluation import EvaluateSystem
@@ -290,17 +290,6 @@ def main():
         logger.warning(f"Importing modules from {args.include_path}")
         import_modules(args.include_path)
 
-    evaluator = EvaluateSystem(
-        model=args.model,
-        api_key=api_key,
-        api_base=api_base,
-        prompt_message=args.prompt_message,
-        system_message=args.system_message,
-        user_message=args.user_message,
-        output_path=args.output_path,
-        use_run_name=~args.use_output_path_only
-        )
-
     if args.data_kwargs is not None:
         data_kwargs = eval(args.data_kwargs)
     else:
@@ -311,21 +300,62 @@ def main():
     else:
         task_kwargs = {}
 
+    evaluator = EvaluateSystem(
+        model=args.model,
+        api_key=api_key,
+        api_base=api_base,
+        # prompt_message=prompt_message,
+        # system_message=args.system_message,
+        # user_message=args.user_message,
+        output_path=args.output_path,
+        use_run_name=~args.use_output_path_only
+        )
+
+    def get_prompt_message(task_name):
+        prompt_dict = {
+            "p//": "prompt_message",
+            "s//": "system_message",
+            "u//": "user_message",
+        }
+        for sign, arg in prompt_dict.items():
+            if sign in task_name:
+                task, message = task_name.split(sign)
+                return task, {arg: message}
+        return task_name, {}
+
+    prompt_message = args.prompt_message
     task_list = args.task.split(",")
-    for task in task_list:
-        logger.info(f"Task: {task}")
+    for task_name in task_list:
+        logger.info(f"Task: {task_name}")
+        if "+" in task_name:
+            subtask_list = []
+            for task in task_name.split("+"):
+                subtask, message_args = get_prompt_message(task)
+                aux_task_args = {**aux_task_args, **message_args}
+                subtask_list.append(
+                    TASK_LIST[subtask](name=subtask, **aux_task_args)
+                )
+            task_object = YevalTask(
+                subtask_list=subtask_list,
+                )
+        else:
+            task, message_args = get_prompt_message(task_name)
+            aux_task_args = {**aux_task_args, **message_args}
+            task_object = TASK_LIST[task](name=task, **aux_task_args)
+        
         if run_name is None:
-            task_run_name = f"{args.model}-{task}-{args.prompt_message}"
+            task_run_name = f"{args.model}-{task_name}"
         else:
             if len(task_list) > 1:
-                task_run_name = f"{run_name}-{task}-{args.prompt_message}"
+                task_run_name = f"{run_name}-{task_name}"
             else:
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
 
         asyncio.run(
             evaluator.run(
-            TASK_LIST[task](name=task, **aux_task_args),
+            # TASK_LIST[task](name=task, **aux_task_args),
+            task_object,
             sampling_args=simple_parse_args_string(args.sample_args) if args.sample_args else None,
             run_name=task_run_name,
             n_samples=args.n_samples
