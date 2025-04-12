@@ -38,14 +38,9 @@ class YevalDataset(Dataset):
         if data_kwargs is None:
             data_kwargs = {}
 
-        if "data_files" in data_kwargs:
-            data_name = data_kwargs["data_files"]
-            data_kwargs.pop("data_files")
-
         if data_path in ["json", "csv"]:
             self.dataset = load_dataset(
                 path=data_path,
-                data_files=data_name,
                 **data_kwargs
             )
         else:

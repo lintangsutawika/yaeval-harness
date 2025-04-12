@@ -35,7 +35,9 @@ class EvaluateSystem:
                  use_run_name=True,
                  verbose=False,
                  sampling_args=None,
+                 prompt_message=None,
                  system_message=None,
+                 user_message=None,
                  postprocessor=None,
                  system_role="assistant",
                  max_rps=500,
@@ -65,8 +67,11 @@ class EvaluateSystem:
             base_url=api_base,
         )
         self.api_process = api_process
-        self.system_role = "assistant"
-        self.system_message, self.postprocessor = get_prompt(system_message)
+        self.system_role = system_role or "assistant"
+        self.system_message, self.user_message, self.postprocessor = get_prompt(prompt_message)
+        
+        self.system_message = system_message or self.system_message
+        self.user_message = user_message or self.user_message
         # postprocessor can be overwritten by the system_message
         self.postprocessor = get_postprocess_fn(postprocessor or self.postprocessor)
         self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
@@ -241,20 +246,26 @@ class EvaluateSystem:
         # new_state["raw_input"] = x
         new_state["ground_truth"] = y
         x, state = task.preprocess(x, state)
+        message_args = {}
         if self.system_message is not None:
-            x = task.build_message(x, state, system_message=self.system_message)
-        else:
-            x = task.build_message(x, state)
+            message_args["system_message"] = self.system_message
+        if self.user_message is not None:
+            message_args["user_message"] = self.user_message
+        x = task.build_message(x, state, **message_args)
         new_state["full_input"] = x
         o, _state = await self.fetch_completion(x, task.sampling_args)
+        task.check_termination(o[0], state)
         new_state["completion"] = o
         if task.logging:
             new_state["log"] = task.logging(_state)
             # new_state["log"] = {}
         # new_state = {**new_state, **_state}
         if isinstance(o, list):
-            o = [task.postprocess(_o, new_state, fn=self.postprocessor) for _o in o]
-            sample_score = [task.eval(_o, y) for _o in o]
+            o = [task.postprocess(_o, {**state, **new_state}, fn=self.postprocessor)[0] for _o in o]
+            if task.eval_at_k:
+                sample_score = [task.eval(o, y)]
+            else:
+                sample_score = [task.eval(_o, y) for _o in o]
             new_state["eval"] = {}
             for score in sample_score:
                 for metric_name, metric_score in score.items():
@@ -269,8 +280,9 @@ class EvaluateSystem:
                         ) for k in new_state["eval"].keys()
                     }
         else:
-            o, state = task.postprocess(o, new_state, fn=self.postprocessor)
+            o, state = task.postprocess(o, {**state, **new_state}, fn=self.postprocessor)
             new_state["eval"] = self.eval(o, y)
+
         new_state["output"] = o
 
         return o, new_state
@@ -279,73 +291,47 @@ class EvaluateSystem:
         state = {
             "sample_id": idx,
             "current_step": 0,
+            "task_step": 0,
             "step": []
             }
 
         if task.subtask_list is None:
-            # while task.terminate:
-            output, _state = await self.run_step(
-                                            task,
-                                            idx,
-                                            state,
-                                            # sampling_args=self.sampling_args
-                                            )
-            state["step"].append(
-                {"step_id": 0,
-                "task": task.name,
-                **_state}
-            )
+            state["current_loop"] = 0
+            while True:
+                output, _state = await self.run_step(
+                                                task,
+                                                idx,
+                                                state,
+                                                )
+                state["step"].append(
+                    {"step_id": 0,
+                    "task": task.name,
+                    **_state}
+                )
+                state["current_step"] += 1
+                state["current_loop"] += 1
+                if task.terminate:
+                    break
+            state["task_step"] += 1
             return output, state
 
         for _id, task in enumerate(task.subtask_list):
-            # while task.terminate:
-            # self.sampling_args = {**sampling_args, **task.sampling_args}
-            output, _state = await self.run_step(
-                                            task,
-                                            idx,
-                                            state=state,
-                                            # sampling_args=self.sampling_args,
-                                            )
-            state["step"].append(
-                {"step_id": _id,
-                 "task": task.name,
-                 **_state}
-            )
-            state["current_step"] += 1
+            state["current_loop"] = 0
+            while True:
+                output, _state = await self.run_step(
+                                                task,
+                                                idx,
+                                                state=state,
+                                                )
 
+                state["step"].append(
+                    {"step_id": _id,
+                    "task": task.name,
+                    **_state}
+                )
+                state["current_step"] += 1
+                state["current_loop"] += 1
+                if task.terminate:
+                    break
+        state["task_step"] += 1
         return output, state
-
-    def build_message(self, x, state=None):
-
-        if "system_message" in state:
-            system_message = state["system_message"]
-        else:
-            system_message = self.system_message
-
-        if system_message in SYSTEM_MESSAGE:
-            system_message = SYSTEM_MESSAGE[system_message]
-
-        message = [{"role": "user", "content": x}]
-        system_role = self.system_role
-        if system_message is not None:
-            if system_role:
-                message.insert(
-                    0, 
-                    {"role": system_role, "content": system_message}
-                    )
-            else:
-                return [{"role": "user", "content": system_message+"\n\n"+x}]
-
-        return message
-
-
-
-
-
-
-
-
-
-
-
-

@@ -10,13 +10,13 @@ def match_routing(prediction, ground_truth):
         return 1
     return 0
 
-def preprocess_routing(x, state):
+def preprocess_routing(x, state, pl_system_message, nl_system_message):
     current_step = state["current_step"]
-    solve_with = state["step"][current_step-1]["output"][0].split("\n")
+    solve_with = state["step"][current_step-1]["output"][0].split("\n")[0]
     if solve_with == "programming language":
-        state["system_message"] = "code"
+        state["system_message"] = pl_system_message
     elif solve_with == "natural language":
-        state["system_message"] = "cot"
+        state["system_message"] = nl_system_message
     return x, state
 
 def postprocess_routing(x, state):

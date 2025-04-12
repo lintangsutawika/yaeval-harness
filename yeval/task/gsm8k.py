@@ -3,7 +3,7 @@ from functools import partial
 
 from yeval.task import register_task, YevalTask
 
-from yeval.logging.usage import log_token_usage
+from yeval.log.usage import log_token_usage
 from yeval.response import (
     match_routing,
     preprocess_routing,
@@ -63,7 +63,7 @@ class GSM8KTask(YevalTask):
     fewshot_input_text=gsm8k_fewshot_input
     fewshot_output_text=gsm8k_fewshot_output
     fewshot_split="train"
-    test_split="validation"
+    test_split="test"
     evaluation={"accuracy": math_eval}
     logging=log_token_usage
 

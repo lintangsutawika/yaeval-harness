@@ -5,6 +5,18 @@ import subprocess
 import pandas as pd
 # from zeno_client import ZenoClient, ZenoMetric
 # TODO: Function to fill in results to a csv or google spreadsheet
+import os
+import glob
+import importlib
+import logging
+
+logging.basicConfig(
+    format="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
+    datefmt="%Y-%m-%d:%H:%M:%S",
+    level=logging.WARNING,
+)
+
+from functools import partial
 
 
 def simple_parse_args_string(args_string):
@@ -18,7 +30,7 @@ def simple_parse_args_string(args_string):
         return {}
     arg_list = [arg for arg in args_string.split(",") if arg]
     args_dict = {
-        k: handle_arg_string(v) for k, v in [arg.split("=") for arg in arg_list]
+        k: handle_arg_string(v) if k != "extra_body" else eval(v) for k, v in [arg.split("=") for arg in arg_list]
     }
     return args_dict
 
@@ -103,3 +115,25 @@ def extract_fn(answer: str):
         return extracted_answer
     except:
 	    return answer
+
+def import_modules(path=None):
+
+    if path is None:
+        path = os.path.dirname(__file__)
+
+    module_files = glob.glob(
+        os.path.join(
+            path, "**", "*.py"
+            ), recursive=True
+        )
+
+    for file in module_files:
+        module_name = os.path.basename(file)[:-3]
+        if module_name not in ["__init__", "__main__"] and module_name.isidentifier():
+            try:
+                spec = importlib.util.spec_from_file_location(f"{module_name}", file)
+                foo = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(foo)
+                # importlib.import_module(f".{module_name}", package=__name__)
+            except Exception as e:
+                logging.warning(f"{file}: {e}")

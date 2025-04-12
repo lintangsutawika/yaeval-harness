@@ -1,5 +1,6 @@
 import os
 import sys
+import atexit
 import asyncio
 import logging
 import requests
@@ -15,7 +16,7 @@ import importlib.util
 
 from yeval.utils import simple_parse_args_string
 
-from yeval.task import TASK_LIST
+from yeval.task import TASK_LIST, YevalTask
 from yeval.prompt import PROMPT_LIST
 from yeval.response import POSTPROCESS
 from yeval.evaluation import EvaluateSystem
@@ -89,10 +90,22 @@ def setup_parser() -> argparse.ArgumentParser:
     #     help="Rescore the output",
     # )
     parser.add_argument(
+        "--prompt_message",
+        default=None,
+        type=str,
+        help="Custom prompt message",
+    )
+    parser.add_argument(
         "--system_message",
         default=None,
         type=str,
         help="Custom system message",
+    )
+    parser.add_argument(
+        "--user_message",
+        default=None,
+        type=str,
+        help="Custom user message",
     )
     parser.add_argument(
         "--use_output_path_only",
@@ -123,7 +136,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--n_samples",
-        default=-1,
+        default=None,
         type=int,
         help="Number of samples to evaluate",
     )
@@ -202,18 +215,42 @@ def main():
 
         def launch_vllm_serve():
             # Construct the command to start the vLLM server
-            command = ["vllm", "serve", args.model, "--disable-log-stats"] 
+            command = ["vllm", "serve", args.model, "--disable-log-stats"]
             if args.server_args:
                 server_args_dict = simple_parse_args_string(args.server_args)
                 server_args_dict = {f"--{k}":v for k,v in server_args_dict.items() if v is not None}
+                if "max_model_len" not in server_args_dict:
+                    server_args_dict["--max_model_len"] = 4096
+                    server_args_dict["--enable-chunked-prefill"] = False
                 command += [str(item) for kv_pair in server_args_dict.items() for item in kv_pair]
 
             # Start the process
-            process = subprocess.Popen(command, env={**os.environ, "VLLM_CONFIGURE_LOGGING": "0"})
+            with open("serve.log", "w") as log_file:
+                process = subprocess.Popen(
+                    command,
+                    env={**os.environ, "VLLM_CONFIGURE_LOGGING": "0"},
+                    stdout=log_file,
+                    stderr=subprocess.STDOUT,
+                )
+
             return process
+
+        def kill_vllm_serve(process):
+            process.terminate()
+            process.wait()
+
+        def on_exit(args, process):
+            # Kill the vLLM server
+            if args.serve and (args.keep == False):
+                logging.info("Killing vLLM server")
+                kill_vllm_serve(process)
 
         # Start the vLLM server
         vllm_server = launch_vllm_serve()
+        atexit.register(
+            on_exit,
+            args=args, process=vllm_server
+        )
 
         url = "http://localhost:8000"
         while not check_api_health(url.split("/v1")[0]+"/health"):
@@ -248,23 +285,10 @@ def main():
     if args.post and (args.post in POSTPROCESS):
         aux_task_args["postprocessor"] = POSTPROCESS[args.post]
 
-    evaluator = EvaluateSystem(
-        model=args.model,
-        api_key=api_key,
-        api_base=api_base,
-        system_message=args.system_message,
-        output_path=args.output_path,
-        use_run_name=~args.use_output_path_only
-        )
-
     if args.include_path is not None:
-        from yeval.dataset import import_modules
+        from yeval.utils import import_modules
         logger.warning(f"Importing modules from {args.include_path}")
         import_modules(args.include_path)
-        # ADDITIONAL_TASK_LIST = dynamic_import("DATASET", args.include_path)
-        # ALL_TASK_LIST = {**ADDITIONAL_TASK_LIST, **TASK_LIST}
-    else:
-        ALL_TASK_LIST = TASK_LIST
 
     if args.data_kwargs is not None:
         data_kwargs = eval(args.data_kwargs)
@@ -276,33 +300,67 @@ def main():
     else:
         task_kwargs = {}
 
+    evaluator = EvaluateSystem(
+        model=args.model,
+        api_key=api_key,
+        api_base=api_base,
+        # prompt_message=prompt_message,
+        # system_message=args.system_message,
+        # user_message=args.user_message,
+        output_path=args.output_path,
+        use_run_name=~args.use_output_path_only
+        )
+
+    def get_prompt_message(task_name):
+        prompt_dict = {
+            "p//": "prompt_message",
+            "s//": "system_message",
+            "u//": "user_message",
+        }
+        for sign, arg in prompt_dict.items():
+            if sign in task_name:
+                task, message = task_name.split(sign)
+                return task, {arg: message}
+        return task_name, {}
+
+    prompt_message = args.prompt_message
     task_list = args.task.split(",")
-    for task in task_list:
-        logger.info(f"Task: {task}")
+    for task_name in task_list:
+        logger.info(f"Task: {task_name}")
+        if "+" in task_name:
+            subtask_list = []
+            for task in task_name.split("+"):
+                subtask, message_args = get_prompt_message(task)
+                aux_task_args = {**aux_task_args, **message_args}
+                subtask_list.append(
+                    TASK_LIST[subtask](name=subtask, **aux_task_args)
+                )
+            task_object = YevalTask(
+                subtask_list=subtask_list,
+                )
+        else:
+            task, message_args = get_prompt_message(task_name)
+            aux_task_args = {**aux_task_args, **message_args}
+            task_object = TASK_LIST[task](name=task, **aux_task_args)
+        
         if run_name is None:
-            task_run_name = f"{args.model}-{task}-{args.system_message}"
+            task_run_name = f"{args.model}-{task_name}"
         else:
             if len(task_list) > 1:
-                task_run_name = f"{run_name}-{task}-{args.system_message}"
+                task_run_name = f"{run_name}-{task_name}"
             else:
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
-        
+
         asyncio.run(
             evaluator.run(
-            ALL_TASK_LIST[task](name=task, **aux_task_args),
+            # TASK_LIST[task](name=task, **aux_task_args),
+            task_object,
             sampling_args=simple_parse_args_string(args.sample_args) if args.sample_args else None,
             run_name=task_run_name,
             n_samples=args.n_samples
         ))
 
-    if args.serve and (args.keep == False):
-        def kill_vllm_serve(process):
-            process.terminate()
-            process.wait()
-
-        # Kill the vLLM server
-        kill_vllm_serve(vllm_server)
 
 if __name__ == "__main__":
     # fire.Fire(main)
