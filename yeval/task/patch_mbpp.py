@@ -5,12 +5,17 @@ import whatthepatch
 from yeval.task import register_task, YevalTask
 
 def apply_patch(patch_code, base_code):
-    patch = list(whatthepatch.parse_patch(patch_code))[0]
-    return whatthepatch.apply_diff(patch, base_code)
+    try:
+        patch = list(whatthepatch.parse_patch(patch_code))[0]
+        return whatthepatch.apply_diff(patch, base_code)
+    except:
+        return ""
     updated_code = "\n".join(whatthepatch.apply_diff(patch, base_code))
     return updated_code
 
 def postprocess_patch(x, state):
+    print("output")
+    print(x)
     original_input = state["full_input"][0]["content"]
     base_code = [line for line in original_input.split("<|diff|>") if line != ""][-1]
 
@@ -24,8 +29,8 @@ def postprocess_patch(x, state):
     else:
         updated_code = current_code
 
-    # print("Code")
-    # print(updated_code)
+    print("Code")
+    print(updated_code)
     return updated_code, state
 
 def convert_to_patch(code_snippet):
@@ -36,7 +41,7 @@ def convert_to_patch(code_snippet):
     return code_patch
 
 def preprocess_patch(x, state):
-    
+
     current_step = state["current_step"]
     if current_step > 0:
         current_code = state["step"][current_step-1]["output"][0]
@@ -45,8 +50,8 @@ def preprocess_patch(x, state):
         updated_code = "\n".join([f"@@ -0,0 +1,{code_length} @@"]+[f"+{line}" for line in current_code])
         x = x.split("<|diff|>")[0]+f"<|diff|>{updated_code}\n<|diff|>"
     
-    # print("Query")
-    # print(x)
+    print("Query")
+    print(x)
     return x, state
 
 def exit_fn(x, state):
@@ -69,7 +74,7 @@ def pass_at_1(completion, test):
 class MBPPStep(YevalTask):
     data_path="evalplus/mbppplus"
     input_text=lambda x: f"{x['prompt']}\n<|diff|>{convert_to_patch(x["code"].split(":")[0]+":")}\n<|diff|>"
-    sampling_args={"stop": ["<|diff|>@@"]}
+    # sampling_args={"stop": ["<|diff|>@@"]}
     loop_max=10
     loop_exit=exit_fn
     output_text=lambda x: x["test_list"]
@@ -83,8 +88,13 @@ class GSM8kStep(MBPPStep):
     data_path="openai/gsm8k"
     data_name="main"
     # Write a function to solve the following problem.\n
-    input_text=lambda x: f"{x['question']}\n<|diff|>{convert_to_patch('def solution():')}\n<|diff|>"
-    sampling_args={"stop": ["<|diff|>@@"]}
+    # input_text=lambda x: f"{x['question']}\n<|diff|>{convert_to_patch('def solution():')}\n<|diff|>"
+    # input_text=lambda x: f"{x['question']}\n<|diff|>"
+    input_text=lambda x: f"{x['question']}\n```\ndef solution():\n```\n<|diff|>"
+    # input_text=lambda x: f"{x['question']}"
+    # input_text=lambda x: """Write a Python function that takes a string as input, and returns two values: the longest substring without repeating characters, and the total number of unique characters in the string. For example, given the string "abcabcbb", the function should return ("abc", 3). If there are multiple substrings of the same length without repeating characters, any one of them will be sufficient."""
+    # sampling_args={"stop": ["<|diff|>", "<|diff|>\n<|diff|>"]}
+    # , "include_stop_str_in_output": True
     loop_max=10
     loop_exit=exit_fn
     output_text=lambda x: [f"assert solution() == {x["answer"].split("####")[-1].strip()}"]
