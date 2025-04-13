@@ -13,7 +13,7 @@ logging.basicConfig(
 
 import argparse
 import importlib.util
-
+from functools import partial
 from yeval.utils import simple_parse_args_string
 
 from yeval.task import TASK_LIST, YevalTask
@@ -323,25 +323,38 @@ def main():
                 return task, {arg: message}
         return task_name, {}
 
+    def get_subtask(task_name, aux_task_args):
+        task_sign = "t//"
+        subtask_sign = "+"
+        if task_sign in task_name:
+            base_task, sub_task = task_name.split(task_sign)
+            subtask_list = []
+            for _task in sub_task.split(subtask_sign):
+                subtask, message_args = get_prompt_message(_task)
+                aux_task_args = {**aux_task_args, **message_args}
+                subtask_list.append(
+                    partial(TASK_LIST[subtask], name=subtask, **aux_task_args)
+                )
+            return base_task, {"subtask_list": subtask_list}
+        task, message_args = get_prompt_message(task_name)
+        return task, {**aux_task_args, **message_args}
+
     prompt_message = args.prompt_message
     task_list = args.task.split(",")
     for task_name in task_list:
         logger.info(f"Task: {task_name}")
-        if "+" in task_name:
-            subtask_list = []
-            for task in task_name.split("+"):
-                subtask, message_args = get_prompt_message(task)
-                aux_task_args = {**aux_task_args, **message_args}
-                subtask_list.append(
-                    TASK_LIST[subtask](name=subtask, **aux_task_args)
-                )
-            task_object = YevalTask(
-                subtask_list=subtask_list,
-                )
+        task, aux_task_args = get_subtask(task_name, aux_task_args)
+        if task in TASK_LIST:
+            task_object = TASK_LIST[task](
+                **aux_task_args)
         else:
-            task, message_args = get_prompt_message(task_name)
-            aux_task_args = {**aux_task_args, **message_args}
-            task_object = TASK_LIST[task](name=task, **aux_task_args)
+            task_object = YevalTask(
+                **aux_task_args
+                )
+        # else:
+        #     task, message_args = get_prompt_message(task_name)
+        #     aux_task_args = {**aux_task_args, **message_args}
+        #     task_object = TASK_LIST[task](name=task, **aux_task_args)
         
         if run_name is None:
             task_run_name = f"{args.model}-{task_name}"
