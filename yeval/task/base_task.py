@@ -71,6 +71,8 @@ class YevalTask:
         num_fewshot: Union[int, float] = None,
         n_samples: Union[int, float] = None,
         dataset = None,
+        evaluation: Union[str, Dict[str, Callable]] = None,
+        **kwargs,
         ):
 
         if dataset is not None:
@@ -101,7 +103,17 @@ class YevalTask:
 
         self.subtask_list = subtask_list
         if self.subtask_list is not None:
-            self.subtask_list = [task(dataset=self.dataset) for task in self.subtask_list]
+            # self.subtask_list = [task(dataset=self.dataset) for task in self.subtask_list]
+            self.subtask_list = [
+                task(
+                    **{
+                        key: getattr(self, key)
+                        for key in dir(self)
+                        if not key.startswith("__") and not callable(getattr(self, key)) and key != "subtask_list"
+                    }
+                )
+                for task in self.subtask_list
+            ]
 
         if name is not None:
             self.name = name 
@@ -153,6 +165,7 @@ class YevalTask:
         if _user_message is not None:
             self.user_message = _user_message
 
+        self.evaluation = evaluation or self.evaluation
         if isinstance(self.evaluation, Callable):
             self.evaluation = {"score": self.evaluation}
         elif isinstance(self.evaluation, str):
