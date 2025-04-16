@@ -51,6 +51,7 @@ class YevalTask:
     loop_exit: Callable=None
     loop_max: int=1
     eval_at_k: bool=False
+    subtask_fn: Union[str, Callable]=None
 
     @staticmethod
     def _input_text(self, x):
@@ -72,6 +73,7 @@ class YevalTask:
         n_samples: Union[int, float] = None,
         dataset = None,
         evaluation: Union[str, Dict[str, Callable]] = None,
+        subtask_fn: Union[str, Callable] = None,
         **kwargs,
         ):
 
@@ -114,11 +116,13 @@ class YevalTask:
                 )
                 for task in self.subtask_list
             ]
+            self.subtask_iter = iter(self.subtask_list)
+        self.subtask_fn = subtask_fn or self.subtask_fn
 
         if name is not None:
             self.name = name 
         #     self.name = self.__name__
-
+        print(f"Task name: {self.name}, self.subtask_list: {self.subtask_list}")
         self.sample_agg_fn = getattr(self.sample_agg_fn, '__func__', self.sample_agg_fn)
         self.logging = getattr(self.logging, '__func__', self.logging)
 
@@ -186,6 +190,23 @@ class YevalTask:
         if self.dataset is None:
             return self.subtask_list[0].__len__()
         return len(self.dataset)
+
+    def next_subtask(self, state=None):
+        try:
+            current_step = state["current_step"]
+            solve_with = state["step"][current_step-1]["output"][0].split("\n")[0]
+            print(solve_with)
+        except:
+            pass
+
+        print("self.subtask_list", self.subtask_list)
+        print("self.subtask_fn", self.subtask_fn)
+        assert len(self.subtask_list) > 0, "No subtask list found"
+        if self.subtask_fn is None:
+            return next(self.subtask_iter)
+        else:
+            next_task = self.subtask_fn(state)
+            return next_task
 
     def check_termination(self, x, state, fn=None):
         fn = fn or self.loop_exit
