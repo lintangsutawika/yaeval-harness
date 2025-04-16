@@ -78,7 +78,7 @@ class EvaluateSystem:
 
     async def fetch_completion(self, messages, sampling_args=None):
         if sampling_args is not None:
-            sampling_args = {**sampling_args, **self.sampling_args}
+            sampling_args = {**self.sampling_args, **sampling_args}
         else:
             sampling_args = self.sampling_args
 

@@ -75,11 +75,9 @@ class YevalTask:
         dataset = None,
         evaluation: Union[str, Dict[str, Callable]] = None,
         subtask_fn: Union[str, Callable] = None,
-        data_kwargs: dict = None,
         **kwargs,
         ):
 
-        self.data_kwargs = data_kwargs or self.data_kwargs
         if dataset is not None:
             self.dataset = dataset
         else:
