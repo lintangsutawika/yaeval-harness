@@ -25,6 +25,8 @@ dependencies = [
     "tqdm",
     "jsonlines",
     "evaluate",
+    "math-verify",
+    "vllm"
 ]
 
 [tool.setuptools.packages.find]
