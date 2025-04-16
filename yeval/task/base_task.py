@@ -103,26 +103,6 @@ class YevalTask:
             else:
                 self.dataset = None
 
-        self.subtask_list = subtask_list
-        if self.subtask_list is not None:
-            # self.subtask_list = [task(dataset=self.dataset) for task in self.subtask_list]
-            self.subtask_list = [
-                task(
-                    **{
-                        key: getattr(self, key)
-                        for key in dir(self)
-                        if not key.startswith("__") and not callable(getattr(self, key)) and key != "subtask_list"
-                    }
-                )
-                for task in self.subtask_list
-            ]
-            self.subtask_iter = iter(self.subtask_list)
-        self.subtask_fn = subtask_fn or self.subtask_fn
-
-        if name is not None:
-            self.name = name 
-        #     self.name = self.__name__
-        print(f"Task name: {self.name}, self.subtask_list: {self.subtask_list}")
         self.sample_agg_fn = getattr(self.sample_agg_fn, '__func__', self.sample_agg_fn)
         self.logging = getattr(self.logging, '__func__', self.logging)
 
@@ -186,26 +166,46 @@ class YevalTask:
         self.terminate = False
         self.loop_exit = getattr(self.loop_exit, '__func__', self.loop_exit)
 
+        self.subtask_list = subtask_list or self.subtask_list
+        if self.subtask_list is not None:
+            # self.subtask_list = [task(dataset=self.dataset) for task in self.subtask_list]
+            self.subtask_list = [
+                task(
+                    **{
+                        key: getattr(self, key)
+                        for key in dir(self)
+                        if not key.startswith("__") and not callable(getattr(self, key)) and key != "subtask_list"
+                    }
+                )
+                for task in self.subtask_list
+            ]
+
+        self.subtask_fn = subtask_fn or getattr(self.subtask_fn, '__func__', self.subtask_fn)
+        self.name = name or type(self).__name__
+
     def __len__(self):
         if self.dataset is None:
             return self.subtask_list[0].__len__()
         return len(self.dataset)
 
-    def next_subtask(self, state=None):
+    def next_subtask(self, state=None, subtask_iter=None):
         try:
             current_step = state["current_step"]
             solve_with = state["step"][current_step-1]["output"][0].split("\n")[0]
-            print(solve_with)
+            print("solve_with", solve_with)
         except:
             pass
 
-        print("self.subtask_list", self.subtask_list)
-        print("self.subtask_fn", self.subtask_fn)
+        # print("self.subtask_list", self.subtask_list)
+        # print("self.subtask_fn", self.subtask_fn)
         assert len(self.subtask_list) > 0, "No subtask list found"
         if self.subtask_fn is None:
-            return next(self.subtask_iter)
+            return next(subtask_iter)
         else:
-            next_task = self.subtask_fn(state)
+            next_task = self.subtask_fn(state, self.subtask_list)
+            # print("next_task", next_task)
+            if next_task is None:
+                return next(subtask_iter)
             return next_task
 
     def check_termination(self, x, state, fn=None):
