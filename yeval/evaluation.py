@@ -318,15 +318,11 @@ class EvaluateSystem:
         # for _id, task in enumerate(task.subtask_list):
         _id = 0
         _task = None
-        print("length of subtask list: ", len(task.subtask_list))
         while True:
-            print(_id)
             if (_task is not None) and (_task.subtask_fn is not None):
-                print(f"Task: {_task}")
                 _task = _task.next_subtask(state=state)
             else:
                 _task = task.next_subtask(state=state)
-            print(f"Next Task: {_task}")
             state["current_loop"] = 0
             while True:
                 output, _state = await self.run_step(
