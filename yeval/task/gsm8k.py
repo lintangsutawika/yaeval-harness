@@ -1,15 +1,6 @@
 import re
 from functools import partial
-
 from yeval.task import register_task, YevalTask
-
-from yeval.log.usage import log_token_usage
-from yeval.response import (
-    match_routing,
-    preprocess_routing,
-    postprocess_routing
-    )
-
 from yeval.metrics import math_eval
 
 def gsm8k_fewshot_input(x):
@@ -60,40 +51,8 @@ class GSM8KTask(YevalTask):
     data_name="main"
     input_text=gsm8k_input
     output_text=gsm8k_output
-    fewshot_input_text=gsm8k_fewshot_input
-    fewshot_output_text=gsm8k_fewshot_output
-    fewshot_split="train"
+    # fewshot_input_text=gsm8k_fewshot_input
+    # fewshot_output_text=gsm8k_fewshot_output
+    # fewshot_split="train"
     test_split="test"
     evaluation={"accuracy": math_eval}
-    logging=log_token_usage
-
-@register_task("gsm8k_select_nl_first")
-class GSM8KRoutingNLFirstTask(GSM8KTask):
-    input_text=lambda x: x['question']+"\n\nWhich method is the best way to solve this problem?"
-    output_text=lambda x: "programming language"
-    system_message="select_nl_first"
-    sampling_args={"stop": ["\n\n", "\n"]}
-    evaluation={"accuracy": match_routing}
-
-@register_task("gsm8k_select_pl_first")
-class GSM8KRoutingPLFirstTask(GSM8KRoutingNLFirstTask):
-   system_message="select_pl_first"
-
-class GSM8KRoutingStage(GSM8KTask):
-   name="solve_gsm8k"
-   preprocessor=preprocess_routing
-   postprocessor=postprocess_routing
-
-@register_task("gsm8k_routing_nl_first")
-class GSM8KRoutingATask(YevalTask):
-   subtask_list=[
-       GSM8KRoutingNLFirstTask,
-       GSM8KRoutingStage
-   ]
-
-@register_task("gsm8k_routing_pl_first")
-class GSM8KRoutingBTask(YevalTask):
-   subtask_list=[
-       GSM8KRoutingPLFirstTask,
-       GSM8KRoutingStage
-   ]

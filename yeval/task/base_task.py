@@ -31,6 +31,7 @@ class YevalTask:
     system_role: str = "assistant"
     logging: callable = None
     sample_agg_fn: callable = np.mean
+    dataset = None
     data_path: str=None
     data_name: str=None
     input_text: Union[str, Callable]=None
@@ -59,6 +60,7 @@ class YevalTask:
     def __init__(
         self,
         name: str = None,
+        subtask_list: list = None,
         preprocessor: Union[str, Callable] = None,
         postprocessor: Union[str, Callable] = None,
         prompt_message:Union[str, YevalPrompt] = None,
@@ -68,33 +70,50 @@ class YevalTask:
         sampling_args: dict = None,
         num_fewshot: Union[int, float] = None,
         n_samples: Union[int, float] = None,
+        dataset = None,
+        evaluation: Union[str, Dict[str, Callable]] = None,
+        **kwargs,
         ):
 
-        if self.subtask_list is not None:
-            self.subtask_list = [task() for task in self.subtask_list]
-
-        if self.data_path is not None:
-            from yeval.task import YevalDataset
-            self.dataset = YevalDataset(
-                data_path=self.data_path,
-                data_name=self.data_name,
-                input_text=self.input_text.__func__,
-                output_text=self.output_text.__func__,
-                preprocessing=self.preprocessing.__func__ if self.preprocessing else None,
-                test_split=self.test_split,
-                fewshot_input_text=self.fewshot_input_text.__func__ if self.fewshot_input_text else None,
-                fewshot_output_text=self.fewshot_output_text.__func__ if self.fewshot_output_text else None,
-                fewshot_split=self.fewshot_split,
-                num_fewshot=self.num_fewshot,
-                sampler=self.sampler,
-                fewshot_delimiter=self.fewshot_delimiter,
-                answer_delimiter=self.answer_delimiter,
-                n_samples=self.n_samples,
-                data_kwargs=self.data_kwargs,
-                batch_processing=self.batch_processing,
-                )
+        if dataset is not None:
+            self.dataset = dataset
         else:
-            self.dataset = None
+            if self.data_path is not None:
+                from yeval.task import YevalDataset
+                self.dataset = YevalDataset(
+                    data_path=self.data_path,
+                    data_name=self.data_name,
+                    input_text=self.input_text.__func__,
+                    output_text=self.output_text.__func__,
+                    preprocessing=self.preprocessing.__func__ if self.preprocessing else None,
+                    test_split=self.test_split,
+                    fewshot_input_text=self.fewshot_input_text.__func__ if self.fewshot_input_text else None,
+                    fewshot_output_text=self.fewshot_output_text.__func__ if self.fewshot_output_text else None,
+                    fewshot_split=self.fewshot_split,
+                    num_fewshot=self.num_fewshot,
+                    sampler=self.sampler,
+                    fewshot_delimiter=self.fewshot_delimiter,
+                    answer_delimiter=self.answer_delimiter,
+                    n_samples=self.n_samples,
+                    data_kwargs=self.data_kwargs,
+                    batch_processing=self.batch_processing,
+                    )
+            else:
+                self.dataset = None
+
+        self.subtask_list = subtask_list
+        if self.subtask_list is not None:
+            # self.subtask_list = [task(dataset=self.dataset) for task in self.subtask_list]
+            self.subtask_list = [
+                task(
+                    **{
+                        key: getattr(self, key)
+                        for key in dir(self)
+                        if not key.startswith("__") and not callable(getattr(self, key)) and key != "subtask_list"
+                    }
+                )
+                for task in self.subtask_list
+            ]
 
         if name is not None:
             self.name = name 
@@ -146,6 +165,7 @@ class YevalTask:
         if _user_message is not None:
             self.user_message = _user_message
 
+        self.evaluation = evaluation or self.evaluation
         if isinstance(self.evaluation, Callable):
             self.evaluation = {"score": self.evaluation}
         elif isinstance(self.evaluation, str):
@@ -201,7 +221,6 @@ class YevalTask:
             return x, state
 
     def build_message(self, x, state=None, system_message=None, user_message=None):
-
         if system_message is not None:
             system_message = system_message
         elif "system_message" in state:
@@ -222,7 +241,10 @@ class YevalTask:
         if user_message is None:
             user_message = x
         elif isinstance(user_message, Callable):
-            user_message = user_message(x)
+            try:
+                user_message = user_message(x)
+            except:
+                user_message = user_message.__func__(x)
         elif isinstance(user_message, str):
             user_message = user_message + "\n" + x
 

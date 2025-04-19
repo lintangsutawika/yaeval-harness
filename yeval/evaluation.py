@@ -201,7 +201,7 @@ class EvaluateSystem:
                     # "user_input": inp,
                     # **output_dict,
                     **(output_dict["log"] if "log" in output_dict else {}),
-                    **steps,
+                    **{k: (v if isinstance(v, (str, int, float, bool, type(None), list, dict)) else str(v)) for k, v in steps.items()},
                 }
             )
 
