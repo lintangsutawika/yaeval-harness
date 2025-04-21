@@ -287,13 +287,14 @@ class EvaluateSystem:
 
         return o, new_state
 
-    async def infer(self, task, idx, system_message=None):
-        state = {
-            "sample_id": idx,
-            "current_step": 0,
-            "task_step": 0,
-            "step": []
-            }
+    async def infer(self, task, idx, state=None):
+        if state is None:
+            state = {
+                "sample_id": idx,
+                "current_step": 0,
+                "task_step": 0,
+                "step": []
+                }
 
         if task.subtask_list is None:
             state["current_loop"] = 0
@@ -315,23 +316,31 @@ class EvaluateSystem:
             state["task_step"] += 1
             return output, state
 
-        for _id, task in enumerate(task.subtask_list):
-            state["current_loop"] = 0
-            while True:
-                output, _state = await self.run_step(
-                                                task,
+        _id = state["task_step"]
+        state["current_loop"] = 0
+        subtask_iter = iter(task.subtask_list)
+        _task, exit_loop = task.next_subtask(state=state, subtask_iter=subtask_iter)
+        while True:
+            if _task is not None:
+                if exit_loop:
+                    _id = state["task_step"]
+                    state["task_step"] += 1
+                    output, _state = await self.run_step(
+                                                _task,
                                                 idx,
                                                 state=state,
                                                 )
+                    state["step"].append(
+                        {"step_id": _id,
+                        "task": _task.name,
+                        **_state}
+                    )
+                else:
+                    output, _state = await self.infer(_task, idx, state=state)
 
-                state["step"].append(
-                    {"step_id": _id,
-                    "task": task.name,
-                    **_state}
-                )
-                state["current_step"] += 1
-                state["current_loop"] += 1
-                if task.terminate:
-                    break
-        state["task_step"] += 1
+            if exit_loop:
+                break
+
+            _task, exit_loop = task.next_subtask(state=state, subtask_iter=subtask_iter)
+
         return output, state
