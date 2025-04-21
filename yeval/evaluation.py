@@ -287,7 +287,7 @@ class EvaluateSystem:
 
         return o, new_state
 
-    async def infer(self, task, idx, system_message=None, state=None):
+    async def infer(self, task, idx, state=None):
         if state is None:
             state = {
                 "sample_id": idx,
@@ -297,7 +297,6 @@ class EvaluateSystem:
                 }
 
         if task.subtask_list is None:
-            print("HERE")
             state["current_loop"] = 0
             while True:
                 output, _state = await self.run_step(
@@ -317,46 +316,31 @@ class EvaluateSystem:
             state["task_step"] += 1
             return output, state
 
-        # for _id, task in enumerate(task.subtask_list):
-        # _id = 0
-        _task = None
+        _id = state["task_step"]
+        state["current_loop"] = 0
         subtask_iter = iter(task.subtask_list)
-        # while True:
-        for _id in range(len(task.subtask_list)):
-            if (_task is not None) and (_task.subtask_fn is not None):
-                _task = _task.next_subtask(state=state, subtask_iter=subtask_iter)
-            else:
-                _task = task.next_subtask(state=state, subtask_iter=subtask_iter)
-            print("_id", _id)
-            print("_task", _task)
+        _task, exit_loop = task.next_subtask(state=state, subtask_iter=subtask_iter)
+        while True:
+            if _task is not None:
+                if exit_loop:
+                    _id = state["task_step"]
+                    state["task_step"] += 1
+                    output, _state = await self.run_step(
+                                                _task,
+                                                idx,
+                                                state=state,
+                                                )
+                    state["step"].append(
+                        {"step_id": _id,
+                        "task": _task.name,
+                        **_state}
+                    )
+                else:
+                    output, _state = await self.infer(_task, idx, state=state)
 
-            output, _state = await self.infer(_task, idx, state=state)
-            print(output, _state)
-            state["step"].append(
-                {"step_id": _id,
-                "task": _task.name,
-                **_state}
-            )
-            # state["current_loop"] = 0
-            # while True:
-            #     output, _state = await self.run_step(
-            #                                     _task,
-            #                                     idx,
-            #                                     state=state,
-            #                                     )
+            if exit_loop:
+                break
 
-                # state["step"].append(
-                #     {"step_id": _id,
-                #     "task": _task.name,
-                #     **_state}
-                # )
-            #     state["current_step"] += 1
-            #     state["current_loop"] += 1
-            #     if _task.terminate:
-            #         break
-            # _id += 1
-            # if _id == len(task.subtask_list):
-            # if _id == 3:
-            #     break
-        state["task_step"] += 1
+            _task, exit_loop = task.next_subtask(state=state, subtask_iter=subtask_iter)
+
         return output, state

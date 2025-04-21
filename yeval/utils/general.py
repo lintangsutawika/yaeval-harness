@@ -137,3 +137,60 @@ def import_modules(path=None):
                 # importlib.import_module(f".{module_name}", package=__name__)
             except Exception as e:
                 logging.warning(f"{file}: {e}")
+
+def parse_tree(task_str):
+    def split_top_level(s, sep):
+        parts = []
+        current = ''
+        depth = 0
+        for char in s:
+            if char == '(':
+                depth += 1
+                current += char
+            elif char == ')':
+                depth -= 1
+                current += char
+            elif char == sep and depth == 0:
+                parts.append(current.strip())
+                current = ''
+            else:
+                current += char
+        if current:
+            parts.append(current.strip())
+        return parts
+
+    def parse_subtree(s):
+        if 't//' in s:
+            root, rest = s.split('t//', 1)
+            children = split_top_level(rest, '+')
+            parsed_children = []
+            for child in children:
+                if child.startswith('(') and child.endswith(')'):
+                    parsed_children.append(parse_subtree(child[1:-1]))
+                else:
+                    parsed_children.append(parse_subtree(child))
+            return [root] + parsed_children
+        else:
+            return [s]
+
+    return parse_subtree(task_str)
+
+def list_to_task_dict(tree):
+    node = {"task": tree[0]}
+    if len(tree) > 1:
+        node["subtask"] = [list_to_task_dict(child) for child in tree[1:]]
+    return node
+
+
+# In [72]: def instantiate_task_tree(tree, TASK_LIST):
+#     ...:     task_name = tree[0]
+#     ...:     subtask_instances = []
+#     ...:
+#     ...:     if len(tree) > 1:
+#     ...:         for child in tree[1:]:
+#     ...:             print(child)
+#     ...:             subtask_instance = instantiate_task_tree(child, TASK_LIST)
+#     ...:             subtask_instances.append(subtask_instance)
+#     ...:             print(subtask_instance)
+#     ...:
+#     ...:     return TASK_LIST[task_name](subtask_list=subtask_instances)

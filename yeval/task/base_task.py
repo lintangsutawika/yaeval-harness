@@ -1,4 +1,5 @@
 import os
+import itertools
 import numpy as np
 
 from dataclasses import dataclass
@@ -189,24 +190,27 @@ class YevalTask:
         return len(self.dataset)
 
     def next_subtask(self, state=None, subtask_iter=None):
-        try:
-            current_step = state["current_step"]
-            solve_with = state["step"][current_step-1]["output"][0].split("\n")[0]
-            print("solve_with", solve_with)
-        except:
-            pass
+        # try:
+        #     current_step = state["current_step"]
+        #     solve_with = state["step"][current_step-1]["output"][0].split("\n")[0]
+        #     print("solve_with", solve_with)
+        # except:
+        #     pass
 
         # print("self.subtask_list", self.subtask_list)
         # print("self.subtask_fn", self.subtask_fn)
         assert len(self.subtask_list) > 0, "No subtask list found"
         if self.subtask_fn is None:
-            return next(subtask_iter)
+            try:
+                next_task = next(subtask_iter)
+            except StopIteration:
+                return None, True
+            return next_task, False
         else:
-            next_task = self.subtask_fn(state, self.subtask_list)
-            # print("next_task", next_task)
+            next_task, exit_iter = self.subtask_fn(state, self.subtask_list)
             if next_task is None:
-                return next(subtask_iter)
-            return next_task
+                return None, True
+            return next_task, exit_iter
 
     def check_termination(self, x, state, fn=None):
         fn = fn or self.loop_exit
