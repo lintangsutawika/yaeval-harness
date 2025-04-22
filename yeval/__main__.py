@@ -291,9 +291,9 @@ def main():
         import_modules(args.include_path)
 
     if args.data_kwargs is not None:
-        data_kwargs = eval(args.data_kwargs)
+        data_kwargs = {"data_kwargs": eval(args.data_kwargs)}
     else:
-        data_kwargs = None
+        data_kwargs = {}
 
     if args.task_kwargs is not None:
         task_kwargs = eval(args.task_kwargs)
@@ -346,10 +346,11 @@ def main():
         task, aux_task_args = get_subtask(task_name, aux_task_args)
         if task in TASK_LIST:
             task_object = TASK_LIST[task](
-                **aux_task_args)
+                **aux_task_args, **data_kwargs)
         else:
             task_object = YevalTask(
-                **aux_task_args
+                **aux_task_args,
+                **data_kwargs,
                 )
         # else:
         #     task, message_args = get_prompt_message(task_name)
