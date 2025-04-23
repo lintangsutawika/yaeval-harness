@@ -1,6 +1,6 @@
 import random
 
-from typing import Union, Callable, Dict
+from typing import Union, Callable, Dict, List
 from functools import partial
 from torch.utils.data import Dataset
 
@@ -25,6 +25,7 @@ class YevalDataset(Dataset):
                  n_samples: Union[int, float]=None,
                  data_kwargs: dict=None,
                  batch_processing: bool=False,
+                 aux_keys: List[str]=None,
                  ):
 
         if name is None:
@@ -142,6 +143,8 @@ class YevalDataset(Dataset):
             self.dataset[test_split] = self.dataset[test_split].map(
                     partial(_transform, fn=prepend_fewshot, feature="__input__", fewshot_samples=fewshot_samples))
 
+        self.aux_keys = aux_keys
+
     def get_fewshot(self, sample_idx):
         fewshot_samples = []
 
@@ -166,6 +169,10 @@ class YevalDataset(Dataset):
             self.dataset[self.test_split][i]["__output__"]
         )
 
+    def __getaux__(self, i):
+        if self.aux_keys is None:
+            return {}
+        return {key: self.dataset[self.test_split][i][key] for key in self.aux_keys}
 
 if __name__ == "__main__":
 

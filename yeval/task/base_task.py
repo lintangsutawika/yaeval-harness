@@ -51,6 +51,7 @@ class YevalTask:
     loop_exit: Callable=None
     loop_max: int=1
     eval_at_k: bool=False
+    aux_keys: List[str]=None
 
     @staticmethod
     def _input_text(self, x):
@@ -73,6 +74,7 @@ class YevalTask:
         dataset = None,
         evaluation: Union[str, Dict[str, Callable]] = None,
         data_kwargs: dict = None,
+        aux_keys: List[str] = None,
         **kwargs,
         ):
 
@@ -99,6 +101,7 @@ class YevalTask:
                     n_samples=self.n_samples,
                     data_kwargs=self.data_kwargs,
                     batch_processing=self.batch_processing,
+                    aux_keys=aux_keys or self.aux_keys,
                     )
             else:
                 self.dataset = None

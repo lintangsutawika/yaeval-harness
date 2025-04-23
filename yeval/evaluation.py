@@ -93,7 +93,7 @@ class EvaluateSystem:
             return None
         except Exception as e:
             print(f"Error fetching chat completion: {e}")
-            return {}
+            return ["None"], {}
 
     async def run(self, task, sampling_args=None, run_name=None, n_samples=None):
 
@@ -243,7 +243,7 @@ class EvaluateSystem:
         sampling_args = sampling_args or {}
         new_state = {}
         x, y = task.dataset.__getitem__(idx)
-        # new_state["raw_input"] = x
+        new_state["aux"] = task.dataset.__getaux__(idx)
         new_state["ground_truth"] = y
         x, state = task.preprocess(x, state)
         message_args = {}
