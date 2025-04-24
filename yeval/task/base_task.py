@@ -75,10 +75,12 @@ class YevalTask:
         evaluation: Union[str, Dict[str, Callable]] = None,
         data_kwargs: dict = None,
         aux_keys: List[str] = None,
+        preprocessing: Union[str, Callable] = None,
         **kwargs,
         ):
 
         self.data_kwargs = data_kwargs or self.data_kwargs
+        self.preprocessing = preprocessing or self.preprocessing
         if dataset is not None:
             self.dataset = dataset
         else:
