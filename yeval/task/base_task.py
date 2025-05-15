@@ -53,6 +53,7 @@ class YevalTask:
     loop_max: int=1
     eval_at_k: bool=False
     subtask_fn: Union[str, Callable]=None
+    aux_keys: List[str]=None
 
     @staticmethod
     def _input_text(self, x):
@@ -76,10 +77,13 @@ class YevalTask:
         evaluation: Union[str, Dict[str, Callable]] = None,
         subtask_fn: Union[str, Callable] = None,
         data_kwargs: dict = None,
+        aux_keys: List[str] = None,
+        preprocessing: Union[str, Callable] = None,
         **kwargs,
         ):
 
         self.data_kwargs = data_kwargs or self.data_kwargs
+        self.preprocessing = preprocessing or self.preprocessing
         if dataset is not None:
             self.dataset = dataset
         else:
@@ -102,6 +106,7 @@ class YevalTask:
                     n_samples=self.n_samples,
                     data_kwargs=self.data_kwargs,
                     batch_processing=self.batch_processing,
+                    aux_keys=aux_keys or self.aux_keys,
                     )
             else:
                 self.dataset = None

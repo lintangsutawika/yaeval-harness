@@ -278,7 +278,7 @@ class EvaluateSystem:
         sampling_args = sampling_args or {}
         new_state = {}
         x, y = task.dataset.__getitem__(idx)
-        # new_state["raw_input"] = x
+        new_state["aux"] = task.dataset.__getaux__(idx)
         new_state["ground_truth"] = y
         x, state = task.preprocess(x, state)
         message_args = {}
