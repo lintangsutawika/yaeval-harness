@@ -1,4 +1,5 @@
 import os
+import itertools
 import numpy as np
 
 from dataclasses import dataclass
@@ -51,6 +52,7 @@ class YevalTask:
     loop_exit: Callable=None
     loop_max: int=1
     eval_at_k: bool=False
+    subtask_fn: Union[str, Callable]=None
     aux_keys: List[str]=None
 
     @staticmethod
@@ -73,6 +75,7 @@ class YevalTask:
         n_samples: Union[int, float] = None,
         dataset = None,
         evaluation: Union[str, Dict[str, Callable]] = None,
+        subtask_fn: Union[str, Callable] = None,
         data_kwargs: dict = None,
         aux_keys: List[str] = None,
         preprocessing: Union[str, Callable] = None,
@@ -107,24 +110,6 @@ class YevalTask:
                     )
             else:
                 self.dataset = None
-
-        self.subtask_list = subtask_list
-        if self.subtask_list is not None:
-            # self.subtask_list = [task(dataset=self.dataset) for task in self.subtask_list]
-            self.subtask_list = [
-                task(
-                    **{
-                        key: getattr(self, key)
-                        for key in dir(self)
-                        if not key.startswith("__") and not callable(getattr(self, key)) and key != "subtask_list"
-                    }
-                )
-                for task in self.subtask_list
-            ]
-
-        if name is not None:
-            self.name = name 
-        #     self.name = self.__name__
 
         self.sample_agg_fn = getattr(self.sample_agg_fn, '__func__', self.sample_agg_fn)
         self.logging = getattr(self.logging, '__func__', self.logging)
@@ -189,10 +174,50 @@ class YevalTask:
         self.terminate = False
         self.loop_exit = getattr(self.loop_exit, '__func__', self.loop_exit)
 
+        self.subtask_list = subtask_list or self.subtask_list
+        if self.subtask_list is not None:
+            # self.subtask_list = [task(dataset=self.dataset) for task in self.subtask_list]
+            self.subtask_list = [
+                task(
+                    **{
+                        key: getattr(self, key)
+                        for key in dir(self)
+                        if not key.startswith("__") and not callable(getattr(self, key)) and key != "subtask_list"
+                    }
+                )
+                for task in self.subtask_list
+            ]
+
+        self.subtask_fn = subtask_fn or getattr(self.subtask_fn, '__func__', self.subtask_fn)
+        self.name = name or type(self).__name__
+
     def __len__(self):
         if self.dataset is None:
             return self.subtask_list[0].__len__()
         return len(self.dataset)
+
+    def next_subtask(self, state=None, subtask_iter=None):
+        # try:
+        #     current_step = state["current_step"]
+        #     solve_with = state["step"][current_step-1]["output"][0].split("\n")[0]
+        #     print("solve_with", solve_with)
+        # except:
+        #     pass
+
+        # print("self.subtask_list", self.subtask_list)
+        # print("self.subtask_fn", self.subtask_fn)
+        assert len(self.subtask_list) > 0, "No subtask list found"
+        if self.subtask_fn is None:
+            try:
+                next_task = next(subtask_iter)
+            except StopIteration:
+                return None, True
+            return next_task, False
+        else:
+            next_task, exit_iter = self.subtask_fn(state, self.subtask_list)
+            if next_task is None:
+                return None, True
+            return next_task, exit_iter
 
     def check_termination(self, x, state, fn=None):
         fn = fn or self.loop_exit
@@ -227,7 +252,7 @@ class YevalTask:
         else:
             return x, state
 
-    def build_message(self, x, state=None, system_message=None, user_message=None):
+    def build_message(self, x, state=None, system_message=None, user_message=None, chat=True):
         if system_message is not None:
             system_message = system_message
         elif "system_message" in state:
@@ -255,17 +280,17 @@ class YevalTask:
         elif isinstance(user_message, str):
             user_message = user_message + "\n" + x
 
-        message = [{"role": "user", "content": user_message}]
-        if system_message is None:
-            return message
-
-        if self.system_role:
-            message.insert(
-                0, 
-                {"role": self.system_role, "content": system_message}
-                )
+        if chat:
+            message = [{"role": "user", "content": user_message}]
+            if system_message:
+                if self.system_role:
+                    message.insert(0, {"role": self.system_role, "content": system_message})
+                else:
+                    message = [{"role": "user", "content": f"{system_message}\n\n{user_message}"}]
         else:
-            return [{"role": "user", "content": system_message+"\n\n"+user_message}]
+            message = f"{system_message}\n\n{user_message}" if system_message else user_message
+
+        return message
 
         return message
 
