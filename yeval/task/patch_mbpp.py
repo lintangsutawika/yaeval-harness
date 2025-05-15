@@ -16,6 +16,7 @@ def apply_patch(patch_code, base_code):
 def postprocess_patch(x, state):
     print("output")
     print(x)
+    print(state)
     original_input = state["full_input"][0]["content"]
     base_code = [line for line in original_input.split("<|diff|>") if line != ""][-1]
 
@@ -73,8 +74,8 @@ def pass_at_1(completion, test):
 @register_task("mbpp_patch_by_patch")
 class MBPPStep(YevalTask):
     data_path="evalplus/mbppplus"
-    input_text=lambda x: f"{x['prompt']}\n<|diff|>{convert_to_patch(x["code"].split(":")[0]+":")}\n<|diff|>"
-    # sampling_args={"stop": ["<|diff|>@@"]}
+    # input_text=lambda x: f"{x['prompt']}\n```\n{convert_to_patch(x["code"].split(":")[0]+":")}\n```\n<|diff|>@@"
+    input_text=lambda x: f"{x['prompt']}\n```{x["code"].split(":")[0]+":"}\n```\n<|diff|>@@"
     loop_max=10
     loop_exit=exit_fn
     output_text=lambda x: x["test_list"]
@@ -90,7 +91,7 @@ class GSM8kStep(MBPPStep):
     # Write a function to solve the following problem.\n
     # input_text=lambda x: f"{x['question']}\n<|diff|>{convert_to_patch('def solution():')}\n<|diff|>"
     # input_text=lambda x: f"{x['question']}\n<|diff|>"
-    input_text=lambda x: f"{x['question']}\n```\ndef solution():\n```\n<|diff|>"
+    input_text=lambda x: f"{x['question']}\n```\ndef solution():\n```\n<|diff|>@@"
     # input_text=lambda x: f"{x['question']}"
     # input_text=lambda x: """Write a Python function that takes a string as input, and returns two values: the longest substring without repeating characters, and the total number of unique characters in the string. For example, given the string "abcabcbb", the function should return ("abc", 3). If there are multiple substrings of the same length without repeating characters, any one of them will be sufficient."""
     # sampling_args={"stop": ["<|diff|>", "<|diff|>\n<|diff|>"]}
