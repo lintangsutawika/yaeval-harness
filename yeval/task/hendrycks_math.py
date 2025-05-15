@@ -59,3 +59,32 @@ class MATHPrealgebraTask(MATHBaseTask):
 @register_task("math_precalculus")
 class MATHPrecalculusTask(MATHBaseTask):
     data_name='precalculus'
+
+@register_task("full_math_algebra")
+class FullMATHAlgebraTask(MATHBaseTask):
+    data_name='algebra'
+    preprocessing=None
+
+@register_task("full_math_counting_and_probability")
+class FullMATHCountingAndProbabilityTask(FullMATHAlgebraTask):
+    data_name='counting_and_probability'
+
+@register_task("full_math_geometry")
+class FullMATHGeometryTask(FullMATHAlgebraTask):
+    data_name='geometry'
+
+@register_task("full_math_intermediate_algebra")
+class FullMATHIntermediateAlgebraTask(FullMATHAlgebraTask):
+    data_name='intermediate_algebra'
+
+@register_task("full_math_number_theory")
+class FullMATHNumberTheoryTask(FullMATHAlgebraTask):
+    data_name='number_theory'
+
+@register_task("full_math_prealgebra")
+class FullMATHPrealgebraTask(FullMATHAlgebraTask):
+    data_name='prealgebra'
+
+@register_task("full_math_precalculus")
+class FullMATHPrecalculusTask(FullMATHAlgebraTask):
+    data_name='precalculus'
