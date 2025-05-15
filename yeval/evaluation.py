@@ -20,7 +20,7 @@ from vllm import SamplingParams
 from yeval.prompt import get_prompt
 from yeval.response import get_postprocess_fn
 from yeval.utils import check_api_health
-from yeval.utils.api_postprocess import vllm_postprocess
+from yeval.utils.api_postprocess import vllm_postprocess, openai_completion_postprocess
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class EvaluateSystem:
                  model,
                  api_key="EMPTY",
                  api_base="http://localhost:8000/v1",
-                 api_process=vllm_postprocess,
+                 api_process=None,
                  output_path=None,
                  run_args=None,
                  use_run_name=True,
@@ -41,6 +41,8 @@ class EvaluateSystem:
                  postprocessor=None,
                  system_role="assistant",
                  max_rps=500,
+                 chat_completion=True,
+                 max_new_tokens=1024,
                  **kwargs,
                  ):
 
@@ -66,7 +68,12 @@ class EvaluateSystem:
             api_key=api_key,
             base_url=api_base,
         )
-        self.api_process = api_process
+        if api_process is None:
+            if chat_completion:
+                self.api_process = vllm_postprocess
+            else:
+                self.api_process = openai_completion_postprocess
+
         self.system_role = system_role or "assistant"
         self.system_message, self.user_message, self.postprocessor = get_prompt(prompt_message)
         
@@ -76,7 +83,10 @@ class EvaluateSystem:
         self.postprocessor = get_postprocess_fn(postprocessor or self.postprocessor)
         self.postprocessor = getattr(self.postprocessor, '__func__', self.postprocessor)
 
-    async def fetch_completion(self, messages, sampling_args=None):
+        self.chat_completion = chat_completion
+        self.max_new_tokens = max_new_tokens
+
+    async def fetch_chat_completion(self, messages, sampling_args=None):
         if sampling_args is not None:
             sampling_args = {**sampling_args, **self.sampling_args}
         else:
@@ -88,12 +98,34 @@ class EvaluateSystem:
                 **sampling_args,
             )
             return self.api_process(response)
-            return response
-        except asyncio.CancelledError:
-            return None
+            # return response
+        # except asyncio.CancelledError:
+        #     return None
         except Exception as e:
             print(f"Error fetching chat completion: {e}")
-            return {}
+            return [""], {}
+
+    async def fetch_completion(self, messages, sampling_args=None):
+        if sampling_args is not None:
+            sampling_args = {**sampling_args, **self.sampling_args}
+        else:
+            sampling_args = self.sampling_args
+
+        if "max_tokens" not in sampling_args:
+            sampling_args["max_tokens"] = self.max_new_tokens
+
+        try:
+            response = await self.client.completions.create(
+                prompt=messages,
+                **sampling_args,
+            )
+            return self.api_process(response)
+            # return response
+        # except asyncio.CancelledError:
+        #     return None
+        except Exception as e:
+            print(f"Error fetching completion: {e}")
+            return [""], {}
 
     async def run(self, task, sampling_args=None, run_name=None, n_samples=None):
 
@@ -211,7 +243,10 @@ class EvaluateSystem:
         for key in result_keys:
             if key == "n_samples":
                 continue
-            result_dict[f"avg_{key}"] = result_dict[key]/result_dict["n_samples"]
+            try:
+                result_dict[f"avg_{key}"] = result_dict[key]/result_dict["n_samples"]
+            except:
+                pass
         
         logger.warning(f"{self.run_name} complete")
         logger.warning(
@@ -251,9 +286,12 @@ class EvaluateSystem:
             message_args["system_message"] = self.system_message
         if self.user_message is not None:
             message_args["user_message"] = self.user_message
-        x = task.build_message(x, state, **message_args)
+        x = task.build_message(x, state, **message_args, chat=self.chat_completion)
         new_state["full_input"] = x
-        o, _state = await self.fetch_completion(x, task.sampling_args)
+        if self.chat_completion:
+            o, _state = await self.fetch_chat_completion(x, task.sampling_args)
+        else:
+            o, _state = await self.fetch_completion(x, task.sampling_args)
         task.check_termination(o[0], state)
         new_state["completion"] = o
         if task.logging:

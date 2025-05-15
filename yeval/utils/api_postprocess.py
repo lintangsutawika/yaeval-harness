@@ -56,3 +56,20 @@ def vllm_postprocess(response):
         response_dict
     )
 
+def openai_completion_postprocess(response):
+    """
+    Returns list of responses and the original response object
+    """
+    response_dict = ast.literal_eval(
+        response.model_dump_json(
+            exclude_unset=True,
+            exclude_none=True
+            )
+        )
+    return (
+        [
+            response.choices[i].text
+            for i in range(0, len(response.choices))
+        ],
+        response_dict
+    )

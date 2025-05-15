@@ -247,7 +247,7 @@ class YevalTask:
         else:
             return x, state
 
-    def build_message(self, x, state=None, system_message=None, user_message=None):
+    def build_message(self, x, state=None, system_message=None, user_message=None, chat=True):
         if system_message is not None:
             system_message = system_message
         elif "system_message" in state:
@@ -275,17 +275,17 @@ class YevalTask:
         elif isinstance(user_message, str):
             user_message = user_message + "\n" + x
 
-        message = [{"role": "user", "content": user_message}]
-        if system_message is None:
-            return message
-
-        if self.system_role:
-            message.insert(
-                0, 
-                {"role": self.system_role, "content": system_message}
-                )
+        if chat:
+            message = [{"role": "user", "content": user_message}]
+            if system_message:
+                if self.system_role:
+                    message.insert(0, {"role": self.system_role, "content": system_message})
+                else:
+                    message = [{"role": "user", "content": f"{system_message}\n\n{user_message}"}]
         else:
-            return [{"role": "user", "content": system_message+"\n\n"+user_message}]
+            message = f"{system_message}\n\n{user_message}" if system_message else user_message
+
+        return message
 
         return message
 

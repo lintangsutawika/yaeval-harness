@@ -141,6 +141,12 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Number of samples to evaluate",
     )
     parser.add_argument(
+        "--max_new_tokens",
+        default=1024,
+        type=int,
+        help="Max number of new tokens",
+    )
+    parser.add_argument(
         "--include_path",
         default=None,
         type=str,
@@ -157,6 +163,10 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--no_system_role",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--no_chat_completion",
         action="store_true",
     )
     return parser
@@ -304,6 +314,8 @@ def main():
         model=args.model,
         api_key=api_key,
         api_base=api_base,
+        chat_completion=not args.no_chat_completion,
+        max_new_tokens=args.max_new_tokens,
         # prompt_message=prompt_message,
         # system_message=args.system_message,
         # user_message=args.user_message,
