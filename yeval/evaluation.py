@@ -15,8 +15,6 @@ from functools import partial
 from typing import List, Tuple
 from torch.utils.data import DataLoader
 
-from vllm import SamplingParams
-
 from yeval.prompt import get_prompt
 from yeval.response import get_postprocess_fn
 from yeval.utils import check_api_health
@@ -40,7 +38,7 @@ class EvaluateSystem:
                  user_message=None,
                  postprocessor=None,
                  system_role="assistant",
-                 max_rps=500,
+                 max_rps=2,
                  chat_completion=True,
                  max_new_tokens=1024,
                  **kwargs,
@@ -56,9 +54,11 @@ class EvaluateSystem:
         self.sampling_args = sampling_args or {}
         self.sampling_args["model"] = model
 
-        while check_api_health(
-            api_base.split("/v1")[0]+"/health"
-            ) is False:
+        while True:
+            check_1 = check_api_health(api_base.split("/v1")[0]+"/health")
+            check_2 = check_api_health(api_base.split("/v1")[0])
+            if check_1 or check_2:
+                break
 
             logger.info("API is not available, retrying...")
             time.sleep(5)
@@ -168,37 +168,19 @@ class EvaluateSystem:
             return ranges
 
         n_ranges = chunk_len(n_samples, self.max_rps)
-        #with concurrent.futures.ThreadPoolExecutor(max_workers=256) as executor:
-        #    futures = [
-        #        executor.submit(
-        #                task.infer,
-        #                idx,
-        #                fetch_completions=self.fetch_completion,
-        #                sampling_args=sampling_args,
-        #                system_message=self.system_message,
-        #            ) for idx in range(n_samples)
-        #        ]
 
-        #    all_results = []
-        #    for i, future in enumerate(tqdm(concurrent.futures.as_completed(futures), total=len(futures))):
-        #        all_results.append(future.result())
-                #try:
-                #    all_results.append(future.result())
-                #except Exception as e:
-                #    print(f"Request {i} failed with error: {e}")
-                #    pass
         all_results = []
-        for n_range in n_ranges:
-            all_requests = [
-                self.infer(
+        with tqdm(total=n_samples) as pbar:
+            for n_range in n_ranges:
+                all_requests = [
+                    self.infer(
                     task,
                     idx,
-                    # sampling_args=sampling_args,
-                    # system_message=self.system_message
                     ) for idx in range(*n_range)
-            ]
-            chat_completions = await tqdm.gather(*all_requests)
-            all_results.extend([c for c in chat_completions if c is not None])
+                ]
+                chat_completions = await asyncio.gather(*all_requests)
+                all_results.extend([c for c in chat_completions if c is not None])
+                pbar.update(len(chat_completions))
         
         for ans, steps in tqdm(all_results):
             output_dict = steps["step"][-1]
@@ -343,9 +325,11 @@ class EvaluateSystem:
                                                 state,
                                                 )
                 state["step"].append(
-                    {"step_id": 0,
-                    "task": task.name,
-                    **_state}
+                    {
+                        "step_id": 0,
+                        "task": task.name,
+                        **_state
+                        }
                 )
                 state["current_step"] += 1
                 state["current_loop"] += 1
@@ -369,9 +353,11 @@ class EvaluateSystem:
                                                 state=state,
                                                 )
                     state["step"].append(
-                        {"step_id": _id,
-                        "task": _task.name,
-                        **_state}
+                        {
+                            "step_id": _id,
+                            "task": _task.name,
+                            **_state
+                            }
                     )
                 else:
                     output, _state = await self.infer(_task, idx, state=state)
