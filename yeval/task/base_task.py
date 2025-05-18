@@ -168,15 +168,12 @@ class YevalTask:
 
         if self.sampling_args is None:
             self.sampling_args = {}
-        # self.sampling_args = sampling_args or {}
-        # self.system_role = system_role
 
         self.terminate = False
         self.loop_exit = getattr(self.loop_exit, '__func__', self.loop_exit)
 
         self.subtask_list = subtask_list or self.subtask_list
         if self.subtask_list is not None:
-            # self.subtask_list = [task(dataset=self.dataset) for task in self.subtask_list]
             self.subtask_list = [
                 task(
                     **{
@@ -197,15 +194,7 @@ class YevalTask:
         return len(self.dataset)
 
     def next_subtask(self, state=None, subtask_iter=None):
-        # try:
-        #     current_step = state["current_step"]
-        #     solve_with = state["step"][current_step-1]["output"][0].split("\n")[0]
-        #     print("solve_with", solve_with)
-        # except:
-        #     pass
 
-        # print("self.subtask_list", self.subtask_list)
-        # print("self.subtask_fn", self.subtask_fn)
         assert len(self.subtask_list) > 0, "No subtask list found"
         if self.subtask_fn is None:
             try:
