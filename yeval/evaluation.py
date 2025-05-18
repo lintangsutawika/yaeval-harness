@@ -150,8 +150,6 @@ class EvaluateSystem:
 
         user_input = []
         ground_truth = []
-        # Use ThreadPoolExecutor for concurrent 
-        # execution with a progress bar
 
         n_samples = n_samples or task.__len__()
 
