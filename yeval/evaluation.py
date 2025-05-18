@@ -38,7 +38,7 @@ class EvaluateSystem:
                  user_message=None,
                  postprocessor=None,
                  system_role="assistant",
-                 max_rps=2,
+                 max_rps=250,
                  chat_completion=True,
                  max_new_tokens=1024,
                  **kwargs,
