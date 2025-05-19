@@ -63,6 +63,7 @@ class YevalTask:
     def __init__(
         self,
         name: str = None,
+        data_path: str = None,
         subtask_list: list = None,
         preprocessor: Union[str, Callable] = None,
         postprocessor: Union[str, Callable] = None,
@@ -79,9 +80,11 @@ class YevalTask:
         data_kwargs: dict = None,
         aux_keys: List[str] = None,
         preprocessing: Union[str, Callable] = None,
+        test_split: str = None,
         **kwargs,
         ):
 
+        self.data_path = self.data_path or data_path
         self.data_kwargs = data_kwargs or self.data_kwargs
         self.preprocessing = preprocessing or self.preprocessing
         if dataset is not None:
@@ -92,10 +95,10 @@ class YevalTask:
                 self.dataset = YevalDataset(
                     data_path=self.data_path,
                     data_name=self.data_name,
-                    input_text=self.input_text.__func__,
-                    output_text=self.output_text.__func__,
+                    input_text=getattr(self.input_text, '__func__', self.input_text),
+                    output_text=getattr(self.output_text, '__func__', self.output_text),
                     preprocessing=self.preprocessing.__func__ if self.preprocessing else None,
-                    test_split=self.test_split,
+                    test_split=test_split or self.test_split,
                     fewshot_input_text=self.fewshot_input_text.__func__ if self.fewshot_input_text else None,
                     fewshot_output_text=self.fewshot_output_text.__func__ if self.fewshot_output_text else None,
                     fewshot_split=self.fewshot_split,
