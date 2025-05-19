@@ -79,6 +79,16 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Task to evaluate model on",
     )
     parser.add_argument(
+        "--input_key",
+        default=None,
+        type=str,
+    )
+    parser.add_argument(
+        "--output_key",
+        default=None,
+        type=str,
+    )
+    parser.add_argument(
         "--post",
         default=None,
         type=str,
@@ -356,6 +366,14 @@ def main():
     for task_name in task_list:
         logger.info(f"Task: {task_name}")
         task, aux_task_args = get_subtask(task_name, aux_task_args)
+
+        # if "@" in task:
+        #     aux_task_args["data_path"] = task.split("@")[0]
+        #     data_kwargs = {
+        #         **{"data_files": task.split("@")[-1]},
+        #         **data_kwargs,
+        #         }
+
         if task in TASK_LIST:
             task_object = TASK_LIST[task](
                 **aux_task_args, **data_kwargs)
