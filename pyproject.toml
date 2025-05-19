@@ -26,8 +26,10 @@ dependencies = [
     "jsonlines",
     "evaluate",
     "math-verify",
-    "vllm"
 ]
+
+[project.optional-dependencies]
+vllm = ["vllm"]
 
 [tool.setuptools.packages.find]
 include = ["yeval*"]
