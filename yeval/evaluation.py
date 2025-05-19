@@ -40,7 +40,7 @@ class EvaluateSystem:
                  system_role="assistant",
                  max_rps=250,
                  chat_completion=True,
-                 max_new_tokens=1024,
+                 max_new_tokens=4096,
                  **kwargs,
                  ):
 
@@ -176,9 +176,11 @@ class EvaluateSystem:
                     idx,
                     ) for idx in range(*n_range)
                 ]
-                chat_completions = await asyncio.gather(*all_requests)
-                all_results.extend([c for c in chat_completions if c is not None])
-                pbar.update(len(chat_completions))
+                for completion in asyncio.as_completed(all_requests):
+                    result = await completion
+                    if result is not None:
+                        all_results.append(result)
+                    pbar.update(1)
         
         for ans, steps in tqdm(all_results):
             output_dict = steps["step"][-1]
