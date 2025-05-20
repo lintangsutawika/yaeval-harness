@@ -31,7 +31,7 @@ class YevalTask:
     sampling_args: dict =None
     system_role: str = "assistant"
     logging: callable = None
-    sample_agg_fn: callable = np.mean
+    sample_agg_fn: Union[dict, Callable] = np.mean
     dataset = None
     data_path: str=None
     data_name: str=None
@@ -72,6 +72,7 @@ class YevalTask:
         user_message: Union[str, Callable] = None,
         system_role: str = None,
         sampling_args: dict = None,
+        sample_agg_fn: Union[dict, Callable] = None,
         num_fewshot: Union[int, float] = None,
         n_samples: Union[int, float] = None,
         dataset = None,
@@ -114,7 +115,13 @@ class YevalTask:
             else:
                 self.dataset = None
 
-        self.sample_agg_fn = getattr(self.sample_agg_fn, '__func__', self.sample_agg_fn)
+        self.sample_agg_fn = sample_agg_fn or self.sample_agg_fn
+        if isinstance(self.sample_agg_fn, Callable):
+            self.sample_agg_fn = getattr(self.sample_agg_fn, '__func__', self.sample_agg_fn)
+        elif isinstance(self.evaluation, dict):
+            for key, value in self.sample_agg_fn.items():
+                self.sample_agg_fn[key] = getattr(value, '__func__', value)
+
         self.logging = getattr(self.logging, '__func__', self.logging)
 
         if system_role is False:
