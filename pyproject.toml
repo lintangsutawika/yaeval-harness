@@ -8,7 +8,7 @@ version = "0.0.1"
 authors = [
     {name="Lintang Sutawika", email="lsutawik@andrew.cmu.edu"}
 ]
-description = "For Evaluating Code Reasoning"
+description = "Yet another evaluation suite library"
 readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -42,10 +42,8 @@ yeval = ["**/*.yaml", "tasks/**/*"]
 yeval = "yeval.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/lintangsutawika/chain-of-code-thinking"
-Repository = "https://github.com/lintangsutawika/chain-of-code-thinking"
-
-[project.optional-dependencies]
+Homepage = "https://github.com/lintangsutawika/yaeval-harness"
+Repository = "https://github.com/lintangsutawika/yaeval-harness"
 
 [tool.ruff.lint]
 extend-select = ["I"]
