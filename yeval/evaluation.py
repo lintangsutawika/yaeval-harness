@@ -228,7 +228,7 @@ class EvaluateSystem:
             try:
                 result_dict[f"avg_{key}"] = result_dict[key]/result_dict["n_samples"]
             except:
-                pass
+                result_dict[f"avg_{key}"] = -1
         
         logger.warning(f"{self.run_name} complete")
         logger.warning(
@@ -294,11 +294,18 @@ class EvaluateSystem:
                     else:
                         new_state["eval"][metric_name] = [metric_score]
             if task.sample_agg_fn:
-                new_state["eval"] = {
-                    k: task.sample_agg_fn(
-                        new_state["eval"][k]
-                        ) for k in new_state["eval"].keys()
-                    }
+                if isinstance(task.sample_agg_fn, dict):
+                    new_state["eval"] = {
+                        k: task.sample_agg_fn[k](
+                            new_state["eval"][k]
+                            ) for k in new_state["eval"].keys()
+                        }
+                else:
+                    new_state["eval"] = {
+                        k: task.sample_agg_fn(
+                            new_state["eval"][k]
+                            ) for k in new_state["eval"].keys()
+                        }
         else:
             o, state = task.postprocess(o, {**state, **new_state}, fn=self.postprocessor)
             new_state["eval"] = self.eval(o, y)
