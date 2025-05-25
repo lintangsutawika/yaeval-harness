@@ -1,4 +1,5 @@
 import os
+import gc
 import sys
 import atexit
 import asyncio
@@ -402,6 +403,10 @@ def main():
             else:
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
+
+        # Avoid GC processing "static" data - reduce pause times.
+        gc.collect()
+        gc.freeze()
 
         asyncio.run(
             evaluator.run(
