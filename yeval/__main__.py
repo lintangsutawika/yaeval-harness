@@ -179,6 +179,12 @@ def setup_parser() -> argparse.ArgumentParser:
         "--no_chat_completion",
         action="store_true",
     )
+    parser.add_argument(
+        "--max_rps",
+        default=100,
+        type=int,
+        help="Max requests per second",
+    )
     return parser
 
 def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
@@ -330,7 +336,8 @@ def main():
         # system_message=args.system_message,
         # user_message=args.user_message,
         output_path=args.output_path,
-        use_run_name=~args.use_output_path_only
+        use_run_name=~args.use_output_path_only,
+        max_rps=args.max_rps,
         )
 
     def get_prompt_message(task_name):

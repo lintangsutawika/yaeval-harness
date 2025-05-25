@@ -186,7 +186,7 @@ class EvaluateSystem:
             output_dict = steps["step"][-1]
             inp = output_dict["full_input"]
             gt = output_dict["ground_truth"]
-            score_dict = output_dict['eval']
+            score_dict = output_dict["eval"]
             score_string = ", ".join([
                 f"{metric}: {score}" for metric,score in score_dict.items()
                 ])
@@ -196,9 +196,9 @@ class EvaluateSystem:
             result_dict["n_samples"] += 1
             for metric, score in score_dict.items():
                 if metric not in result_dict:
-                    result_dict[metric] = score
+                    result_dict[metric] = score.copy()
                 else:
-                    result_dict[metric] += score
+                    result_dict[metric] += score.copy()
 
             if "log" in output_dict:
                 for key, value in output_dict["log"].items():
@@ -212,8 +212,6 @@ class EvaluateSystem:
                     **score_dict,
                     "ground_truth": gt,
                     "answer": ans,
-                    # "user_input": inp,
-                    # **output_dict,
                     **(output_dict["log"] if "log" in output_dict else {}),
                     **{k: (v if isinstance(v, (str, int, float, bool, type(None), list, dict)) else str(v)) for k, v in steps.items()},
                 }
@@ -229,6 +227,7 @@ class EvaluateSystem:
                 result_dict[f"avg_{key}"] = result_dict[key]/result_dict["n_samples"]
             except:
                 result_dict[f"avg_{key}"] = -1
+            result_dict.pop(key)
         
         logger.warning(f"{self.run_name} complete")
         logger.warning(
