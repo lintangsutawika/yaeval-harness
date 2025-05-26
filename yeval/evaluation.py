@@ -22,6 +22,10 @@ from yeval.utils.api_postprocess import vllm_postprocess, openai_completion_post
 
 logger = logging.getLogger(__name__)
 
+import time
+import sys
+import traceback
+from tqdm.asyncio import tqdm
 from dataclasses import dataclass, field
 from typing import Optional, Union
 
@@ -59,6 +63,7 @@ async def async_request_openai_completions(
     api_base,
     api_key,
     prompt,
+    pbar,
     **sampling_args,
 ) -> RequestFuncOutput:
     api_url = api_base + "completions"
@@ -137,8 +142,8 @@ async def async_request_openai_completions(
             exc_info = sys.exc_info()
             output.error = "".join(traceback.format_exception(*exc_info))
 
-    # if pbar:
-    #     pbar.update(1)
+    if pbar:
+        pbar.update(1)
     return output
 
 class EvaluateSystem:
@@ -159,7 +164,7 @@ class EvaluateSystem:
                  system_role="assistant",
                  max_rps=1000,
                  chat_completion=True,
-                 max_new_tokens=4096,
+                 max_new_tokens=512,
                  **kwargs,
                  ):
 
@@ -233,7 +238,8 @@ class EvaluateSystem:
             sampling_args = self.sampling_args
 
         if "max_tokens" not in sampling_args:
-            sampling_args["max_tokens"] = self.max_new_tokens
+            # sampling_args["max_tokens"] = self.max_new_tokens
+            sampling_args["max_tokens"] = 512
 
         try:
             response = await self.client.completions.create(
@@ -319,33 +325,44 @@ class EvaluateSystem:
         #             pbar.update(1)
 
         all_results = []
-        semaphore = asyncio.Semaphore(self.max_rps)  # Limit concurrent requests
+        # semaphore = asyncio.Semaphore(self.max_rps)  # Limit concurrent requests
         tasks: list[asyncio.Task] = []
 
-        async def limited_infer(task, idx, x):
-            async with semaphore:
-                # return await self.infer(task, idx)
-                return await self.run_step(task, idx, x=x)
-
-        async def get_dataset_item(task, n_samples):
+        async def get_dataset_item(
+            task,
+            n_samples
+        ):
             for idx in range(n_samples):
                 x, y = task.dataset.__getitem__(idx)
                 yield idx, x, y
 
+        async def get_request(
+            input_requests: list,
+        # ) -> AsyncGenerator:
+        ):
+            input_requests: Iterable[SampleRequest] = iter(input_requests)
+            for request in input_requests:
+                yield request
 
         with tqdm(total=n_samples) as pbar:
-            async for idx, x, y in get_dataset_item(task, n_samples):
+            async for (idx, x, y) in get_dataset_item(task, n_samples):
                 tasks.append(
                     asyncio.create_task(
-                        self.run_step(task, idx, x=x, pbar=pbar)
+                        # self.run_step(task, idx, x=x)
+                        self.client.completions.create(
+                            # prompt=request,
+                            prompt="f{idx}"+x,
+                            model="Qwen/Qwen3-4B",
+                            max_tokens=512,
+                        )
                     )
                 )
 
-            all_results = await asyncio.gather(*tasks)
-            # for completed_task in asyncio.as_completed(tasks):
-            #     result = await completed_task
-            #     all_results.append(result)
-            #     pbar.update(1)
+            # all_results = await asyncio.gather(*tasks)
+            for completed_task in asyncio.as_completed(tasks):
+                result = await completed_task
+                all_results.append(result)
+                pbar.update(1)
 
         for ans, steps in tqdm(all_results):
             output_dict = steps["step"][-1]
