@@ -153,7 +153,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--max_new_tokens",
-        default=1024,
+        default=512,
         type=int,
         help="Max number of new tokens",
     )
