@@ -77,7 +77,7 @@ class Server:
                 env["CUDA_VISIBLE_DEVICES"] = f"{i}"
                 process = subprocess.Popen(
                     command+["--port", str(port)], env=env,
-                    # shell=False, stdout=subprocess.DEVNULL
+                    shell=False, stdout=subprocess.DEVNULL
                     )
                 self.process.append(process)
                 print(f"{self.backend} server {self.model_name}, Port: {port}, started with PID: {process.pid}")
@@ -116,9 +116,17 @@ class Server:
         else:
             self.process = subprocess.Popen(
                 command+["--port", str(self.port)],
-                # shell=False, stdout=subprocess.DEVNULL
+                shell=False, stdout=subprocess.DEVNULL
                 )
             print(f"{self.backend} server {self.model_name}, started with PID: {self.process.pid}")
+
+            while True:
+                if check_api_health(f"http://localhost:{self.port}/health/"):
+                    break
+
+                print(f"Waiting for {self.backend} server to start...")
+                time.sleep(15)
+
         return self.process
 
     def stop(self, process=None):
