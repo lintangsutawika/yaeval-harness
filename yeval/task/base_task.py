@@ -98,7 +98,7 @@ class YevalTask:
                     data_name=self.data_name,
                     input_text=getattr(self.input_text, '__func__', self.input_text),
                     output_text=getattr(self.output_text, '__func__', self.output_text),
-                    preprocessing=self.preprocessing.__func__ if self.preprocessing else None,
+                    preprocessing=getattr(self.preprocessing, '__func__', self.preprocessing) if self.preprocessing else None,
                     test_split=test_split or self.test_split,
                     fewshot_input_text=self.fewshot_input_text.__func__ if self.fewshot_input_text else None,
                     fewshot_output_text=self.fewshot_output_text.__func__ if self.fewshot_output_text else None,
