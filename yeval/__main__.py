@@ -186,6 +186,22 @@ def setup_parser() -> argparse.ArgumentParser:
         type=int,
         help="Max requests per second",
     )
+    parser.add_argument(
+        "--use_gcs",
+        action="store_true",
+        help="Use Google Cloud Storage for output",
+    )
+    parser.add_argument(
+        "--file_system_kwargs",
+        default=None,
+        type=str,
+        help="Authentication token for Google Cloud Storage",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing output files",
+    )
     return parser
 
 def parse_eval_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
@@ -339,6 +355,8 @@ def main():
         output_path=args.output_path,
         use_run_name=~args.use_output_path_only,
         max_rps=args.max_rps,
+        use_gcs=args.use_gcs,
+        file_system_kwargs=simple_parse_args_string(args.file_system_kwargs),
         )
 
     def get_prompt_message(task_name):
@@ -403,6 +421,17 @@ def main():
             else:
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
+
+        if not args.overwrite:
+            file_path = os.path.join(args.output_path, task_run_name, "output.jsonl")
+            import fsspec
+            fs = fsspec.filesystem(
+                "gcs" if args.use_gcs else "file",
+                **simple_parse_args_string(args.file_system_kwargs) if args.file_system_kwargs else {}
+            )
+            if fs.exists(file_path):
+                logger.warning(f"Output file {file_path} already exists. Skipping evaluation.")
+                continue
 
         # Avoid GC processing "static" data - reduce pause times.
         gc.collect()

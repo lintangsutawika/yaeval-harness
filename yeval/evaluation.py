@@ -6,6 +6,7 @@ import datetime
 import jsonlines
 import concurrent.futures
 import asyncio
+import fsspec
 from tqdm.asyncio import tqdm
 
 from openai import OpenAI, AsyncOpenAI
@@ -38,9 +39,11 @@ class EvaluateSystem:
                  user_message=None,
                  postprocessor=None,
                  system_role="assistant",
-                 max_rps=1000,
+                 max_rps=512,
                  chat_completion=True,
                  max_new_tokens=512,
+                 use_gcs=False,
+                 file_system_kwargs={},
                  **kwargs,
                  ):
 
@@ -87,6 +90,15 @@ class EvaluateSystem:
 
         self.chat_completion = chat_completion
         self.max_new_tokens = max_new_tokens
+
+        self.use_gcs = use_gcs
+        if self.use_gcs:
+            self.fs = fsspec.filesystem(
+                "gcs",
+                **file_system_kwargs
+                )
+        else:
+            self.fs = fsspec.filesystem("file")
 
     async def fetch_chat_completion(self, messages, sampling_args=None):
         if sampling_args is not None:
@@ -182,6 +194,8 @@ class EvaluateSystem:
                         all_results.append(result)
                     pbar.update(1)
 
+        all_results = sorted(all_results, key=lambda x: x[1]["sample_id"])
+
         for ans, steps in tqdm(all_results):
             output_dict = steps["step"][-1]
             inp = output_dict["full_input"]
@@ -241,15 +255,17 @@ class EvaluateSystem:
                 run_path = os.path.join(self.output_path, self.run_name)
             else:
                 run_path = os.path.join(self.output_path)
-            os.makedirs(run_path, exist_ok=True)
+            
+            self.fs.makedirs(run_path, exist_ok=True)
             result_file = os.path.join(run_path, "result.json")
-            with open(result_file, 'w', encoding='utf-8') as file:
+            with self.fs.open(result_file, 'w', encoding='utf-8') as file:
                 json.dump(result_dict, file, ensure_ascii=False, indent=4)
 
             try:
                 output_file = os.path.join(run_path, "output.jsonl")
-                with jsonlines.open(output_file, "w") as file:
-                    file.write_all(output_json)
+                with self.fs.open(output_file, "w") as file:
+                    jsonlines.Writer(file).write_all(output_json)
+
             except Exception as e:
                 print("Error:", e)
 
