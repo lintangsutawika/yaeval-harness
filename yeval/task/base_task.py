@@ -1,4 +1,5 @@
 import os
+import inspect
 import itertools
 import numpy as np
 
@@ -15,6 +16,15 @@ def match_fn(x, y):
         return 1 if x == y else 0
     except Exception as e:
         return 0
+
+def fn_with_signature_check(fn, x, state=None):
+    sig = inspect.signature(fn)
+    if len(sig.parameters) >= 2:
+        return fn(x, state)
+    elif len(sig.parameters) == 1:
+        return fn(x), state
+    else:
+        raise ValueError(f"Function {fn} must take either one or two arguments.")
 
 class YevalTask:
 
@@ -220,34 +230,26 @@ class YevalTask:
 
     def check_termination(self, x, state, fn=None):
         fn = fn or self.loop_exit
-        current_loop = state["current_loop"]
-        if current_loop == (self.loop_max-1):
-            self.terminate = True
+        if fn is not None:
+            self.terminate = fn_with_signature_check(fn, x, state)
         else:
-            current_loop += 1
-            if fn is not None:
-                try:
-                    self.terminate = fn(x, state)
-                except Exception as e:
-                    self.terminate = fn(x)
+            current_loop = state["current_loop"]
+            if current_loop == (self.loop_max-1):
+                self.terminate = True
+            else:
+                current_loop += 1
 
     def preprocess(self, x, state=None, fn=None):
         fn = fn or self.preprocessor
         if fn is not None:
-            try:
-                return fn(x, state)
-            except Exception as e:
-                return fn(x), state
+            return fn_with_signature_check(fn, x, state)
         else:
             return x, state
 
     def postprocess(self, x, state=None, fn=None):
         fn = fn or self.postprocessor
         if fn is not None:
-            try:
-                return fn(x, state)
-            except Exception as e:
-                return fn(x), state
+            return fn_with_signature_check(fn, x, state)
         else:
             return x, state
 
