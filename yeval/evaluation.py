@@ -273,7 +273,9 @@ class EvaluateSystem:
 
     async def run_step(self, task, idx, state=None, sampling_args=None, x=None):
         sampling_args = sampling_args or {}
-        new_state = {}
+        new_state = {
+            "current_loop": state["current_loop"]
+        }
         x, y = task.dataset.__getitem__(idx)
         new_state["aux"] = task.dataset.__getaux__(idx)
         new_state["ground_truth"] = y
@@ -289,7 +291,6 @@ class EvaluateSystem:
             o, _state = await self.fetch_chat_completion(x, task.sampling_args)
         else:
             o, _state = await self.fetch_completion(x, task.sampling_args)
-        task.check_termination(o[0], state)
         new_state["completion"] = o
         if task.logging:
             new_state["log"] = task.logging(_state)
@@ -326,14 +327,13 @@ class EvaluateSystem:
             new_state["eval"] = self.eval(o, y)
 
         new_state["output"] = o
-
         return o, new_state
 
     async def infer(self, task, idx, state=None):
         if state is None:
             state = {
                 "sample_id": idx,
-                "current_step": 0,
+                "total_step": 0,
                 "task_step": 0,
                 "step": []
                 }
@@ -353,7 +353,8 @@ class EvaluateSystem:
                         **_state
                         }
                 )
-                state["current_step"] += 1
+                task.check_termination(output, state)
+                state["total_step"] += 1
                 state["current_loop"] += 1
                 if task.terminate:
                     break
@@ -381,6 +382,7 @@ class EvaluateSystem:
                             **_state
                             }
                     )
+                    task.check_termination(output, state)
                 else:
                     output, _state = await self.infer(_task, idx, state=state)
 
