@@ -356,7 +356,7 @@ def main():
         use_run_name=~args.use_output_path_only,
         max_rps=args.max_rps,
         use_gcs=args.use_gcs,
-        file_system_kwargs=simple_parse_args_string(args.file_system_kwargs),
+        file_system_kwargs=simple_parse_args_string(args.file_system_kwargs) if args.file_system_kwargs else {},
         )
 
     def get_prompt_message(task_name):
@@ -422,7 +422,7 @@ def main():
                 task_run_name = run_name
         task_run_name = task_run_name.replace("/", "-")
 
-        if not args.overwrite:
+        if not args.overwrite and args.output_path:
             file_path = os.path.join(args.output_path, task_run_name, "output.jsonl")
             import fsspec
             fs = fsspec.filesystem(
