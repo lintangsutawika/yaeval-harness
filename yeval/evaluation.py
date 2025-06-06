@@ -100,14 +100,15 @@ class EvaluateSystem:
         else:
             self.fs = fsspec.filesystem("file")
 
-    async def fetch_chat_completion(self, messages, sampling_args=None):
+    async def fetch_chat_completion(self, messages, sampling_args=None, client=None):
         if sampling_args is not None:
             sampling_args = {**sampling_args, **self.sampling_args}
         else:
             sampling_args = self.sampling_args
 
+        client = client or self.client
         try:
-            response = await self.client.chat.completions.create(
+            response = await client.chat.completions.create(
                 messages=messages,
                 **sampling_args,
             )
@@ -119,7 +120,7 @@ class EvaluateSystem:
             print(f"Error fetching chat completion: {e}")
             return [""], {}
 
-    async def fetch_completion(self, messages, sampling_args=None):
+    async def fetch_completion(self, messages, sampling_args=None, client=None):
         if sampling_args is not None:
             sampling_args = {**sampling_args, **self.sampling_args}
         else:
@@ -128,6 +129,7 @@ class EvaluateSystem:
         if "max_tokens" not in sampling_args:
             sampling_args["max_tokens"] = self.max_new_tokens
 
+        client = client or self.client
         try:
             response = await self.client.completions.create(
                 prompt=messages,

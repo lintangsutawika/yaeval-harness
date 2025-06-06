@@ -26,6 +26,21 @@ def fn_with_signature_check(fn, x, state=None):
     else:
         raise ValueError(f"Function {fn} must take either one or two arguments.")
 
+# @dataclass
+# class State:
+#     answer: Union[str, List] = None
+#     api_url: str
+#     prompt_len: int
+#     output_len: int
+#     model: str
+#     model_name: Optional[str] = None
+#     logprobs: Optional[int] = None
+#     extra_body: Optional[dict] = None
+#     multi_modal_content: Optional[dict] = None
+#     ignore_eos: bool = False
+#     language: Optional[str] = None
+
+
 class YevalTask:
 
     name: str = None
@@ -39,7 +54,7 @@ class YevalTask:
     user_message: Union[str, Callable] = None
     evaluation: Union[str, Dict[str, Callable]]="match"
     sampling_args: dict =None
-    system_role: str = "assistant"
+    system_role: str = "system"
     logging: callable = None
     sample_agg_fn: Union[dict, Callable] = np.mean
     dataset = None
@@ -73,7 +88,10 @@ class YevalTask:
     def __init__(
         self,
         name: str = None,
-        data_path: str = None,
+        data_path: Union[str, bool] = False,
+        data_name: Union[str, bool] = False,
+        input_text: Union[str, Callable] = None,
+        output_text: Union[str, Callable] = None,
         subtask_list: list = None,
         preprocessor: Union[str, Callable] = None,
         postprocessor: Union[str, Callable] = None,
@@ -95,9 +113,16 @@ class YevalTask:
         **kwargs,
         ):
 
-        self.data_path = self.data_path or data_path
+        if data_path is not False:
+            self.data_path = data_path
+        if data_name is not False:
+            self.data_name = data_name
         self.data_kwargs = data_kwargs or self.data_kwargs
         self.preprocessing = preprocessing or self.preprocessing
+
+        self.input_text = input_text or self.input_text
+        self.output_text = output_text or self.output_text
+
         if dataset is not None:
             self.dataset = dataset
         else:
