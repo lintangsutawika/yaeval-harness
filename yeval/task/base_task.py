@@ -52,11 +52,11 @@ class YevalTask:
     prompt_message: Union[str, YevalPrompt] = None
     system_message: Union[str, Callable] = None
     user_message: Union[str, Callable] = None
-    evaluation: Union[str, Dict[str, Callable]]="match"
+    evaluation: Union[str, Dict[str, Callable]]=None
     sampling_args: dict =None
     system_role: str = "system"
     logging: callable = None
-    sample_agg_fn: Union[dict, Callable] = np.mean
+    sample_agg_fn: Union[dict, Callable] = None
     dataset = None
     data_path: str=None
     data_name: str=None
@@ -150,13 +150,6 @@ class YevalTask:
             else:
                 self.dataset = None
 
-        self.sample_agg_fn = sample_agg_fn or self.sample_agg_fn
-        if isinstance(self.sample_agg_fn, Callable):
-            self.sample_agg_fn = getattr(self.sample_agg_fn, '__func__', self.sample_agg_fn)
-        elif isinstance(self.evaluation, dict):
-            for key, value in self.sample_agg_fn.items():
-                self.sample_agg_fn[key] = getattr(value, '__func__', value)
-
         self.logging = getattr(self.logging, '__func__', self.logging)
 
         if system_role is False:
@@ -202,14 +195,43 @@ class YevalTask:
         if _user_message is not None:
             self.user_message = _user_message
 
-        self.evaluation = evaluation or self.evaluation
-        if isinstance(self.evaluation, Callable):
-            self.evaluation = {"score": self.evaluation}
-        elif isinstance(self.evaluation, str):
-            if self.evaluation == "match":
-                self.evaluation = {"match": match_fn}
+        def _eval_fn(evaluation=None):
+            if evaluation is None:
+                return {}
             else:
-                raise NotImplementedError
+                if isinstance(evaluation, Callable):
+                    evaluation = {"score": evaluation}
+                elif isinstance(evaluation, str):
+                    if evaluation == "match":
+                        evaluation = {"match": match_fn}
+                    else:
+                        raise NotImplementedError
+            return evaluation
+
+        self.evaluation = {
+            **_eval_fn(self.evaluation),
+            **_eval_fn(evaluation)
+            }
+        
+        if self.evaluation is {}:
+            self.evaluation = {"match": match_fn}
+        
+        if (sample_agg_fn is None) and (self.sample_agg_fn is None):
+            self.sample_agg_fn = np.mean
+        else:
+            if isinstance(sample_agg_fn, Callable):
+                self.sample_agg_fn = getattr(sample_agg_fn, '__func__', sample_agg_fn)
+            elif isinstance(sample_agg_fn, dict):
+                if isinstance(self.sample_agg_fn, Callable):
+                    self.sample_agg_fn = {
+                        **{key: self.sample_agg_fn for key in self.evaluation.keys()},
+                        **sample_agg_fn,
+                    }
+                if isinstance(self.sample_agg_fn, dict):
+                    self.sample_agg_fn = {
+                        **self.sample_agg_fn,
+                        **sample_agg_fn,
+                    }
 
         if self.sampling_args is None:
             self.sampling_args = {}
