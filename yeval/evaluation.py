@@ -1,4 +1,5 @@
 import os
+import copy
 import json
 import time
 import logging
@@ -222,16 +223,16 @@ class EvaluateSystem:
                         result_dict[key] += value
                     else:
                         result_dict[key] = value
-            output_json.append(
-                {
-                    "idx": idx,
-                    **score_dict,
-                    "ground_truth": gt,
-                    "answer": ans,
-                    **(output_dict["log"] if "log" in output_dict else {}),
-                    **{k: (v if isinstance(v, (str, int, float, bool, type(None), list, dict)) else str(v)) for k, v in steps.items()},
-                }
-            )
+
+            line_dict = {
+                "idx": idx,
+                **score_dict,
+                "ground_truth": gt,
+                "answer": ans,
+                **(output_dict["log"] if "log" in output_dict else {}),
+                **{k: (v if isinstance(v, (str, int, float, bool, type(None), list, dict)) else str(v)) for k, v in steps.items()},
+            }
+            output_json.append(copy.deepcopy(line_dict))
 
             idx += 1
 
