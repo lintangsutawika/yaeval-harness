@@ -69,7 +69,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--seed",
-        default=1234,
+        default=42,
         type=int,
         help="Number of seed",
     )
@@ -153,7 +153,7 @@ def setup_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--max_new_tokens",
-        default=512,
+        default=2048,
         type=int,
         help="Max number of new tokens",
     )
