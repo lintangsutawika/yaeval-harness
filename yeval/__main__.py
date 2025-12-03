@@ -420,7 +420,7 @@ def main():
                 task_run_name = f"{run_name}-{task_name}"
             else:
                 task_run_name = run_name
-        task_run_name = task_run_name.replace("/", "-")
+        task_run_name = task_run_name.replace("/", "--")
 
         if not args.overwrite and args.output_path:
             file_path = os.path.join(args.output_path, task_run_name, "output.jsonl")
