@@ -66,7 +66,6 @@ def openai_completion_postprocess(response):
     """
     Returns list of responses and the original response object
     """
-    print("response:", response)
     response_dict = ast.literal_eval(
         response.model_dump_json(
             exclude_unset=True,
