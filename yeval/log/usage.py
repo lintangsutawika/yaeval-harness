@@ -17,9 +17,12 @@ def log_logprob(state):
     try:
         choice_logprob = []
         for choice in state['choices']:
-            logprob_list = [token['logprob'] for token in choice['logprobs']['content']]
-            # choice_logprob.append(sum(logprob_list)/len(logprob_list))
-            choice_logprob.append(sum(logprob_list))
+            if "content" in choice['logprobs']:
+                logprob_list = [token['logprob'] for token in choice['logprobs']['content']]
+            elif "token_logprobs" in choice['logprobs']:
+                logprob_list = choice["logprobs"]["token_logprobs"]
+            choice_logprob.append(sum(logprob_list)/len(logprob_list))
+            # choice_logprob.append(sum(logprob_list))
         return {"logprob": choice_logprob}
     except KeyError:
         return {}

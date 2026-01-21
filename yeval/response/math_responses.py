@@ -66,5 +66,8 @@ def last_boxed_only_string(string):
     return retval
 
 def get_boxed_answer(x):
+    # Remove any \boxed{} LaTeX commands 
+    # that might interfere with answer extraction
+    x = x.replace("\\boxed{}", "")
     return remove_boxed(last_boxed_only_string(x))
 
